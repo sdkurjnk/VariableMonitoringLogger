@@ -17,11 +17,16 @@ class vml:
         target_frame.f_trace = self._trace_lines
 
         if (self.var_names in target_frame.f_globals):
-            self.last_var = copy.deepcopy(target_frame.f_globals[self.var_names])
+            self.last_var = target_frame.f_globals[self.var_names]
             self.domain = "G"
         elif (self.var_names in target_frame.f_code.co_varnames):
-            self.last_var = copy.deepcopy(target_frame.f_locals[self.var_names])
+            self.last_var = target_frame.f_locals[self.var_names]
             self.domain = "L"
+        else:
+            print("There is no such variable.")
+            sys.exit(1)
+        
+        vml.history.append({"name" : self.var_names, "data" : copy.deepcopy(self.last_var)})
 
         sys.settrace(self._trace_calls)
         atexit.register(self._final_save)
@@ -33,11 +38,26 @@ class vml:
     def _trace_lines(self, frame, event, arg):
         if event != 'line': return self._trace_lines
 
-        #if(curr_var == None)
+        result = vml_core.check_variable(frame, self.last_var, self.var_names, self.domain)
 
-        if (vml_core.check_variable(frame, self.last_var, self.var_names, self.domain) == 1):
-            self.last_var = copy.deepcopy(frame.f_locals.get(self.var_names, frame.f_globals.get(self.var_names)))
-            vml.history.append({"name" : self.var_names, "data" : self.last_var})
+        if (result == 1):
+            self.last_var = frame.f_locals.get(self.var_names, frame.globals.get(self.var_names))
+
+            vml.history.append({
+                "name" : self.var_names,
+                "data" : copy.deepcopy(self.last_var),
+                "event" : "update"
+            })
+
+        elif (result is None):
+            if (self.last_var != None):
+                vml.history.append({
+                    "name" : self.var_names,
+                    "data" : None,
+                    "event" : "deleted"
+                })
+
+                self.last_var = None
 
         return self._trace_lines
 

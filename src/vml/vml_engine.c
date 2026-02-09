@@ -25,12 +25,16 @@ static PyObject *vml_check_variable(PyObject *self, PyObject *args)
     }
 
     if (reference_curr == NULL){
+        //1st step : Checking Existance
         Py_RETURN_NONE;
     }
-    else if (reference_curr != reference_prev){
+    
+    if (reference_curr != reference_prev){
+        //2nd step : Checking Reference in Stack
         Py_RETURN_TRUE;
     }
 
+    //3rd step : Checking Data in Heap
     int diff = PyObject_RichCompareBool(reference_curr, reference_prev, Py_NE);
     if (diff == 1){
         Py_RETURN_TRUE;
