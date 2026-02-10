@@ -14,16 +14,17 @@ class vml:
         self.last_var_copy = None
         self.domain_int = None
         self._active = True
+        self._tracing_internal = False
 
         target_frame = sys._getframe(1)
         self.target_frame = target_frame
         
         if self.var_names in target_frame.f_locals:
             target_var = target_frame.f_locals.get(self.var_names)
-            self.domain_int = 0
+            self.domain_int = 0 #Local
         elif self.var_names in target_frame.f_globals:
             target_var = target_frame.f_globals.get(self.var_names)
-            self.domain_int = 1
+            self.domain_int = 1 #Global
         else:
             sys.exit(1)
 
@@ -48,11 +49,17 @@ class vml:
         if not self._active or event != 'line':
             return self._trace_lines
 
+        if self._tracing_internal:
+            return self._trace_lines
+        self._tracing_internal = True
+
         if self.domain_int == 0:
             if frame is not self.target_frame:
+                self._tracing_internal = False
                 return self._trace_lines
         else:
             if frame.f_code.co_filename == __file__:
+                self._tracing_internal = False
                 return self._trace_lines
 
         result = vml_engine.check_variable(
@@ -81,7 +88,8 @@ class vml:
             self.last_var_ref = None
             self.last_var_copy = None
             self._active = False
-            
+        
+        self._tracing_internal = False
         return self._trace_lines
 
     def _final_save(self):
