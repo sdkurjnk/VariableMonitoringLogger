@@ -4,13 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vml-logger"
-version = "0.1.0"
+version = "1.0.0"
 description = "Variable Monitoring Logger with C-Engine"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.11"
+authors = [
+    {name = "sdkurjnk"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Debuggers"
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+zip-safe = false
 
 [tool.setuptools.packages.find]
 where = ["src"]

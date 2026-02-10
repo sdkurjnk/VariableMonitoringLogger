@@ -4,17 +4,21 @@ import json
 
 def test_vml_package():
     log_name = "vml_package_test.jsonl"
+    
+    if os.path.exists(log_name):
+        os.remove(log_name)
+
     print("\n--- Starting Integrated Package Test ---")
     results_check = []
 
     data_target = [100, 200]
+
     monitor = vml.logger("data_target", filename=log_name)
     
     data_target.append(300) 
-    
     data_target = "String Assignment"
-
-    monitor.stop() 
+    
+    monitor._final_save()
 
     if os.path.exists(monitor.filename):
         with open(monitor.filename, "r", encoding="utf-8") as f:

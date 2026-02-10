@@ -1,45 +1,60 @@
 #include <Python.h>
 
+typedef enum {
+    LOCAL = 0,
+    GLOBAL = 1
+} ScopeType;
+
 static PyObject *vml_check_variable(PyObject *self, PyObject *args)
 {
-    PyObject *frame, *reference_prev, *reference_curr, *key, *tmp_domain;
-    if (!PyArg_ParseTuple(args, "OOOO", &frame, &reference_prev, &key, &tmp_domain)) {return NULL;}
+    PyObject *frame, *reference_prev, *last_val_copy, *key;
+    int domain_val;
+    
+    if (!PyArg_ParseTuple(args, "OOOiO", &frame, &reference_prev, &last_val_copy, &domain_val, &key)) {
+        return NULL;
+    }
 
-    const char domain = PyUnicode_AsUTF8(tmp_domain)[0];
+    ScopeType domain = (ScopeType)domain_val;
+    PyObject *reference_curr = NULL;
 
-    if (domain == 'L'){
+    if (domain == LOCAL) {
         PyObject *locals = PyFrame_GetLocals((PyFrameObject *)frame);
-
-        if (locals){
+        if (locals) {
             reference_curr = PyDict_GetItem(locals, key);
             Py_XDECREF(locals);
         }
-    }
-    else{
+    } else {
         PyObject *globals = PyFrame_GetGlobals((PyFrameObject *)frame);
-
-        if (globals){
+        if (globals) {
             reference_curr = PyDict_GetItem(globals, key);
             Py_XDECREF(globals);
         }
     }
 
-    if (reference_curr == NULL){
-        //1st step : Checking Existance
+    //Step1 : Checking existance
+    if (reference_curr == NULL) {
         Py_RETURN_NONE;
     }
-    
-    if (reference_curr != reference_prev){
-        //2nd step : Checking Reference in Stack
+
+    //Step2 : Checking reference in Stack
+    if (reference_curr != reference_prev) {
         Py_RETURN_TRUE;
     }
 
-    //3rd step : Checking Data in Heap
-    int diff = PyObject_RichCompareBool(reference_curr, reference_prev, Py_NE);
-    if (diff == 1){
-        Py_RETURN_TRUE;
+    //Step3 : Checking immutability
+    if (PyLong_Check(reference_curr) || 
+        PyUnicode_Check(reference_curr) || 
+        PyFloat_Check(reference_curr) || 
+        PyBool_Check(reference_curr) || 
+        reference_curr == Py_None) {
+        Py_RETURN_FALSE; 
     }
-    else if (diff == -1){
+
+    //Step4 : Checking Data in Heap
+    int diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
+    if (diff == 1) {
+        Py_RETURN_TRUE;
+    } else if (diff == -1) {
         return NULL;
     }
 

@@ -7,11 +7,17 @@ module = Extension(
 
 setup(
     name="vml-logger",
-    version="0.1.0",
+    version="1.0.0",
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     ext_modules=[module],
-    author="Your Name",
+    author="sdkurjnk",
+    zip_safe = False,
+    classifiers= [
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Operating System :: OS Independent"
+    ],
     description="A Variable Monitoring Logger with C-Engine and Visualizer",
-    python_requires=">=3.7",
+    python_requires=">=3.11",
 )
