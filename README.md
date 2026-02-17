@@ -110,7 +110,7 @@ sequenceDiagram
 ```json
 {"name" : "A", "data" : [1, 2, 3], "event" : "init"}
 {"name" : "A", "data" : [1, 2, 3, 4], "event" : "updated"}
-{"name" : "A", "data" : None, "event" : "deleted"}
+{"name" : "A", "data" : null, "event" : "deleted"}
 ```
 
 이 형식은 대용량 로그 처리와 스트리밍 파싱에 적합합니다.
@@ -142,15 +142,15 @@ python setup.py build_ext --inplace
 ## Project Structure
 ```bash
 .
-├── pyproject.toml      #빌드 및 배포 설정
+├── pyproject.toml
 ├── setup.cfg
 ├── setup.py
-├── test/               #유닛 테스트 폴더
+├── test/
 └── src/
-  └── vml/              #Python 패키지
+  └── vml/
    ├── __init__.py
-   ├── logger.py        #VML Class
-   └── vml_engine.c     #변수 비교 함수
+   ├── logger.py (Python tracer & wrapper)
+   └── vml_engine.c (C-based detection engine)
 ```
 
 ---
