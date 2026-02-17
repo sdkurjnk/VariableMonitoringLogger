@@ -75,9 +75,10 @@ sequenceDiagram
 
     Note over U, C: [2. 변수 추적 및 변경 감지]
     loop 코드 실행 중
-		    U->>U: 코드 실행
+		U->>U: 코드 실행
         S->>V: 현재 실행 라인 정보 전달 (sys.settrace 호출)
-        V->>C: check_variable(frame, last_ref, last_copy, scope, var_name) 요청
+        V->>C: 변수 비교 요청
+        V->>B: {name, data, event: "init"} 적재
         
         alt 변경 감지 (Return 1)
             C-->>V: 변경됨 신호
