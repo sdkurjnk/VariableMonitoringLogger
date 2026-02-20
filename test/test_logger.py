@@ -1,14 +1,22 @@
 import vml
 import os
 import json
+import sys
 
 def test_vml_package():
     log_name = "vml_package_test.jsonl"
     
     if os.path.exists(log_name):
         os.remove(log_name)
+    
+    try:
+        import vml
+        print("Module import successful.")
+    except ImportError as e:
+        print(f"Failed to import vml: {e}")
+        sys.exit(0)
 
-    print("\n--- Starting Integrated Package Test ---")
+    print("\n--- VML Package Test ---")
     results_check = []
 
     data_target = [100, 200]
@@ -37,6 +45,9 @@ def test_vml_package():
             print("\nSome Tests Failed")
     else:
         print(f"\nFail: Log not found at {monitor.filename}")
+    
+    if os.path.exists(log_name):
+        os.remove(log_name)
 
 if __name__ == "__main__":
     test_vml_package()
