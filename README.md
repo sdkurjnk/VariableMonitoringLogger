@@ -128,14 +128,21 @@ C 컴파일러 (GCC, Clang, MSVC 등)
 
 ## Installation
 
+제공된 테스트 코드를 실행하고자 하는 경우, 다음과 같은 명령어로 설치하면 됩니다.
+
 ```bash
-pip install -e .
+$ pip install -e .
 ```
 
 또는 C 확장 모듈을 직접 빌드할 수 있습니다.
 
 ```bash
-python setup.py build_ext --inplace
+$ python setup.py build_ext --inplace
+```
+
+단순히 패키지 사용만을 원하는 것이라면 다음 명령어로 설치하면 됩니다.
+```bash
+$ pip install .
 ```
 
 ---
