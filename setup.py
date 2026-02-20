@@ -7,7 +7,7 @@ module = Extension(
 
 setup(
     name="vml",
-    version="1.0.0",
+    version="1.0.2",
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     ext_modules=[module],
