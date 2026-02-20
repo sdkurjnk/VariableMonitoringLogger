@@ -4,13 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vml"
-version = "1.0.2"
-description = "Variable Monitoring Logger with C-Engine"
+version = "1.0.3"
+authors = [{name = "sdkurjnk"}]
+description = "A Variable Monitoring Logger with C-Engine and Visualizer"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [
-    {name = "sdkurjnk"}
-]
+keywords = ["logging", "monitoring", "c-extension"]
 classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
