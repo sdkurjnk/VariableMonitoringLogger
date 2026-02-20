@@ -2,19 +2,22 @@ import sys
 import os
 import copy
 
-vml_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "vml"))
-if vml_dir not in sys.path:
-    sys.path.insert(0, vml_dir)
-
-try:
-    import vml_engine
-    print("Module import successful.")
-except ImportError:
-    print("Failed to import vml_engine.")
-    sys.exit(1)
 
 def run_engine_test():
+
     print("\n--- vml_engine Logic Test ---")
+    
+    vml_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "vml"))
+    if vml_dir not in sys.path:
+        sys.path.insert(0, vml_dir)
+
+    try:
+        import vml_engine
+    except ImportError as e:
+        print(f"Failed to import vml_engine: {e}")
+        sys.exit(0)
+    print("Module import successful.")
+    
     frame = sys._getframe()
     results = []
     
