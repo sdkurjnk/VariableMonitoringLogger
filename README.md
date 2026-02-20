@@ -126,7 +126,7 @@ C 컴파일러 (GCC, Clang, MSVC 등)
 
 ---
 
-## Installation
+## Installation&Test
 
 제공된 테스트 코드를 실행하고자 하는 경우, 다음과 같은 명령어로 설치하면 됩니다.
 
@@ -144,6 +144,8 @@ $ python setup.py build_ext --inplace
 ```bash
 $ pip install .
 ```
+
+설치 후, test/test.py를 실행하여 테스트를 진행할 수 있습니다.
 
 ---
 
