@@ -145,22 +145,27 @@ $ python setup.py build_ext --inplace
 $ pip install .
 ```
 
-설치 후, test/test.py를 실행하여 테스트를 진행할 수 있습니다.
+설치 후, tests/test.py를 실행하여 테스트를 진행할 수 있습니다.
 
 ---
 
-## Project Structure
+## Directory Structure
 ```bash
 .
-├── pyproject.toml
-├── setup.cfg
+├── .gitignore
+├── LICENSE             # MIT LICENSE
+├── README.md
+├── pyproject.toml      # 빌드 및 배포 설정
 ├── setup.py
-├── test/
+├── tests/
+│ ├── test.py           # 유닛 테스트 코드
+│ ├── test_vml_engine.py
+│ └── test_logger.py
 └── src/
-  └── vml/
+  └── vml/              # VML 패키지
    ├── __init__.py
-   ├── logger.py (Python tracer & wrapper)
-   └── vml_engine.c (C-based detection engine)
+   ├── logger.py        # VML Class
+   └── vml_engine.c     # 변수 비교 함수
 ```
 
 ---
