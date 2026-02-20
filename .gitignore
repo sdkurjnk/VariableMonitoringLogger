@@ -6,6 +6,6 @@ build/
 
 *.pyd
 
-vml_logger.egg-info/
+vml.egg-info/
 
 __pycache__/
