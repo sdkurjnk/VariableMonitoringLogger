@@ -26,7 +26,8 @@ class vml:
             target_var = target_frame.f_globals.get(self.var_names)
             self.domain_int = 1 #Global
         else:
-            sys.exit(1)
+            print(f"{self.var_names} is not found.")
+            sys.exit(0)
 
         self.last_var_ref = target_var
         self.last_var_copy = copy.deepcopy(target_var)
