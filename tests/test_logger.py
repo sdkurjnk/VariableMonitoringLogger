@@ -8,6 +8,8 @@ def test_vml_package():
     
     if os.path.exists(log_name):
         os.remove(log_name)
+
+    print("\n--- VML Package Test ---")
     
     try:
         import vml
@@ -16,7 +18,6 @@ def test_vml_package():
         print(f"Failed to import vml: {e}")
         sys.exit(0)
 
-    print("\n--- VML Package Test ---")
     results_check = []
 
     data_target = [100, 200]
