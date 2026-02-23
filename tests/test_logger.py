@@ -28,8 +28,8 @@ def test_vml_package():
     
     monitor._final_save()
 
-    if os.path.exists(monitor.filename):
-        with open(monitor.filename, "r", encoding="utf-8") as f:
+    if os.path.exists(log_name):
+        with open(log_name, "r", encoding="utf-8") as f:
             logs = [json.loads(line) for line in f]
             
         print(f"Captured Events: {len(logs)}")
@@ -42,9 +42,9 @@ def test_vml_package():
         if all(results_check):
             print("\nAll Tests Passed")
         else:
-            print("\nSome Tests Failed")
+            print(f"\nSome Tests Failed. Log not found at {log_name}")
     else:
-        print(f"\nFail: Log not found at {monitor.filename}")
+        print(f"\nFail: Log not found at {log_name}")
     
     if os.path.exists(log_name):
         os.remove(log_name)
