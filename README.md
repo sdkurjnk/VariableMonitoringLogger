@@ -146,6 +146,26 @@ $ pip install .
 ```
 
 설치 후, tests/test.py를 실행하여 테스트를 진행할 수 있습니다.
+```bash
+--- VML Package Test ---
+Module import successful.
+Captured Events: 3
+Event 0 [init]: [100, 200]
+Event 1 [updated]: [100, 200, 300]
+Event 2 [updated]: String Assignment
+
+All Tests Passed
+
+--- vml_engine Logic Test ---
+Module import successful.
+Test 1 (Existence): None -> Pass
+Test 2 (No Change): False -> Pass
+Test 3 (Stack/Ref): True -> Pass
+Test 4 (Heap/Data): True -> Pass
+
+All Tests Passed
+```
+위와 같은 결과가 출력된다면 패키지가 정상적으로 설치된 것입니다.
 
 ---
 
