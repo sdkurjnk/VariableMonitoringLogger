@@ -173,19 +173,19 @@ All Tests Passed
 ```bash
 .
 ├── .gitignore
-├── LICENSE             # MIT LICENSE
+├── LICENSE              # MIT LICENSE
 ├── README.md
-├── pyproject.toml      # 빌드 및 배포 설정
+├── pyproject.toml       # 빌드 및 배포 설정
 ├── setup.py
-├── tests/
-│ ├── test.py           # 유닛 테스트 코드
-│ ├── test_vml_engine.py
-│ └── test_logger.py
+├── tests/               # 유닛 테스트 폴더
+│   ├── test.py
+│   ├── test_vml_engine.py
+│   └── test_logger.py
 └── src/
-  └── vml/              # VML 패키지
-   ├── __init__.py
-   ├── logger.py        # VML Class
-   └── vml_engine.c     # 변수 비교 함수
+    └── vml/              # VML 패키지
+        ├── __init__.py
+        ├── logger.py     # VML Class
+        └── vml_engine.c  # 변수 비교 함수
 ```
 
 ---
