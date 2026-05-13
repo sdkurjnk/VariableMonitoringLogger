@@ -67,6 +67,7 @@ class vml:
 
         if self.__domain_int == 0:
             if frame is not self.__target_frame:
+                self.__tracing_internal = False
                 return self._trace_lines
         else:
             if frame.f_code.co_filename == __file__:
