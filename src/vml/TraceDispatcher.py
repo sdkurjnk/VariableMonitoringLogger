@@ -1,33 +1,49 @@
 import sys
+from .ScopeResolver import ScopeResolver
+from .VariableTracker import VariableTracker
 
 class TraceDispatcher:
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(TraceDispatcher, cls).__new__(cls)
-            cls._instance._trackers = []
-            cls._instance._is_tracing = False
-            cls._instance._bufferRef = None
-        return cls._instance
-
-    @classmethod
-    def get_instance(cls):
-        return cls()
+    def __init__(self):
+        self._trackers = []
+        self._is_tracing = False
+        self._bufferRef = None
+        self._resolver = ScopeResolver()
 
     def setBuffer(self, buffer):
-        self._buffer = buffer
+        self._bufferRef = buffer
 
-    def register(self, tracker):
+    def register(self, varName, domain=None, value=None, frame=None):
+        tracker = VariableTracker(
+            varName,
+            domain=domain,
+            value=value,
+            exists=domain in (0, 1),
+            frame=frame
+        )
         self._trackers.append(tracker)
+
+        if domain in (0, 1) and self._bufferRef is not None:
+            self._bufferRef.append(varName, tracker.get_snapshot(), "init")
+
         if not self._is_tracing:
             sys.settrace(self._trace_calls)
             self._is_tracing = True
+
+        if frame is not None:
+            frame.f_trace = self._trace_lines
+
+        return tracker
 
     def unregister(self, tracker):
         if tracker in self._trackers:
             self._trackers.remove(tracker)
         if not self._trackers and self._is_tracing:
+            sys.settrace(None)
+            self._is_tracing = False
+
+    def stop(self):
+        self._trackers.clear()
+        if self._is_tracing:
             sys.settrace(None)
             self._is_tracing = False
 
@@ -40,7 +56,17 @@ class TraceDispatcher:
         if event not in ('line', 'return'):
             return self._trace_lines
 
-        for tracker in self._trackers:
-            tracker.check(frame)
+        for tracker in list(self._trackers):
+            if tracker.domain == 0 and tracker.frame is not None and frame is not tracker.frame:
+                continue
+            if tracker.domain == 1 and tracker.frame is not None and frame.f_globals is not tracker.frame.f_globals:
+                continue
+
+            domain, _ = self._resolver.resolve(frame, tracker.varName)
+            event_name = tracker.check(frame, domain, tracker.varName)
+
+            if event_name in ("init", "updated", "deleted") and self._bufferRef is not None:
+                data = None if event_name == "deleted" else tracker.get_snapshot()
+                self._bufferRef.append(tracker.varName, data, event_name)
 
         return self._trace_lines

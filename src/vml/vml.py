@@ -1,36 +1,42 @@
 import sys
 import atexit
-from HistoryBuffer import HistoryBuffer
-from TraceDispatcher import TraceDispatcher
-from VariableTracker import VariableTracker
-from FileWriter import FileWriter
+from .HistoryBuffer import HistoryBuffer
+from .TraceDispatcher import TraceDispatcher
+from .FileWriter import FileWriter
+from .ScopeResolver import ScopeResolver
 
 class VML:
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(VML, cls).__new__(cls)
-            cls._instance._isInitialized = False
-        return cls._instance
-
     def __init__(self, fileName="vml_log.json"):
-        if self._isInitialized:
-            return
-
         self.fileName = fileName
-        self.buffer = HistoryBuffer()       
-        self._isInitialized = True
+        self.buffer = HistoryBuffer()
 
-        self.dispatcher = TraceDispatcher(self.buffer)
-        self.dispatcher.start()             
+        self.dispatcher = TraceDispatcher()
+        self.dispatcher.setBuffer(self.buffer)
 
-        self.fileWriter = FileWriter()      
+        self.resolver = ScopeResolver()
+        self.fileWriter = FileWriter()
+        self._saved = False
         atexit.register(self._finalSave)
 
-    def logger(self, varName):
-        tracker = VariableTracker(varName)
-        self.dispatcher.register(tracker)
+    def logger(self, varName, frame=None):
+        if frame is None:
+            frame = sys._getframe(1)
+
+        domain, value = self.resolver.resolve(frame, varName)
+        self.dispatcher.register(varName, domain, value, frame)
+        return self
 
     def _finalSave(self):
-        self.fileWriter.write(self.fileName, self.buffer)
+        self._final_save()
+
+    def _final_save(self):
+        if self._saved:
+            return
+        self.dispatcher.stop()
+        self.fileWriter.write(self.fileName, self.buffer.getHistory())
+        self._saved = True
+
+
+def logger(varName, filename="vml_log.json"):
+    monitor = VML(filename)
+    return monitor.logger(varName, sys._getframe(1))

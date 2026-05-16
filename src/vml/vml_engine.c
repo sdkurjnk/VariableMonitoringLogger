@@ -20,24 +20,26 @@ static PyObject *vml_check_variable(PyObject *self, PyObject *args)
     if (domain == LOCAL) {
         PyObject *locals = PyFrame_GetLocals((PyFrameObject *)frame);
         if (locals) {
-            reference_curr = PyDict_GetItem(locals, key);
+            reference_curr = PyObject_GetItem(locals, key);
             Py_XDECREF(locals);
         }
     } else {
         PyObject *globals = PyFrame_GetGlobals((PyFrameObject *)frame);
         if (globals) {
-            reference_curr = PyDict_GetItem(globals, key);
+            reference_curr = PyObject_GetItem(globals, key);
             Py_XDECREF(globals);
         }
     }
 
     //Step1 : Checking existance
     if (reference_curr == NULL) {
+        PyErr_Clear();
         Py_RETURN_NONE;
     }
 
     //Step2 : Checking reference in Stack
     if (reference_curr != reference_prev) {
+        Py_DECREF(reference_curr);
         Py_RETURN_TRUE;
     }
 
@@ -47,11 +49,13 @@ static PyObject *vml_check_variable(PyObject *self, PyObject *args)
         PyFloat_Check(reference_curr) || 
         PyBool_Check(reference_curr) || 
         reference_curr == Py_None) {
+        Py_DECREF(reference_curr);
         Py_RETURN_FALSE; 
     }
 
     //Step4 : Checking Data in Heap
     int diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
+    Py_DECREF(reference_curr);
     if (diff == 1) {
         Py_RETURN_TRUE;
     } else if (diff == -1) {

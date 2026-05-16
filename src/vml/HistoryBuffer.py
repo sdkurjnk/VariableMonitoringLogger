@@ -1,17 +1,15 @@
-class HistoryBuffer:
-    _instance = None
+import copy
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(HistoryBuffer, cls).__new__(cls)
-            cls._instance._history = []
-        return cls._instance
+
+class HistoryBuffer:
+    def __init__(self):
+        self._history = []
 
     def append(self, name, data, event):
         self._history.append({"name" : name, "data" : data, "event" : event})
 
     def getHistory(self):
-        return self._history
+        return copy.deepcopy(self._history)
 
     def clearBuffer(self):
         self._history.clear()
