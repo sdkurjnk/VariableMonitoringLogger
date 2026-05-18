@@ -3,7 +3,7 @@ import copy
 try:
     from . import vml_engine
 except ImportError:
-    import vml_engine
+    raise RuntimeError("vml_engine C extension is not found.")
 
 LOCAL = 0
 GLOBAL = 1
@@ -39,8 +39,6 @@ class VariableTracker:
         return self._make_snapshot(self._lastSnapshot)
 
     def check(self, frame, domain, varName=None):
-        if (vml_engine is None):
-            raise RuntimeError("vml_engine C extention is not found.")
 
         if varName is None:
             varName = self.varName
