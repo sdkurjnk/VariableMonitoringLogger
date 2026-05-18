@@ -10,8 +10,7 @@ class VML:
         self.fileName = fileName
         self.buffer = HistoryBuffer()
 
-        self.dispatcher = TraceDispatcher()
-        self.dispatcher.setBuffer(self.buffer)
+        self.dispatcher = TraceDispatcher(self.buffer)
 
         self.resolver = ScopeResolver()
         self.fileWriter = FileWriter()

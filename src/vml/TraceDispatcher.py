@@ -3,10 +3,10 @@ from .ScopeResolver import ScopeResolver
 from .VariableTracker import VariableTracker
 
 class TraceDispatcher:
-    def __init__(self):
+    def __init__(self, buffer = None):
         self._trackers = []
         self._is_tracing = False
-        self._bufferRef = None
+        self._bufferRef = buffer
         self._resolver = ScopeResolver()
 
     def setBuffer(self, buffer):
