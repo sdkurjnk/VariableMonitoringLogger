@@ -39,6 +39,9 @@ class VariableTracker:
         return self._make_snapshot(self._lastSnapshot)
 
     def check(self, frame, domain, varName=None):
+        if (vml_engine is None):
+            raise RuntimeError("vml_engine C extention is not found.")
+
         if varName is None:
             varName = self.varName
 
