@@ -1,4 +1,4 @@
-from .logger import vml as logger
+from .vml import VML, logger
 from importlib.metadata import version, PackageNotFoundError
 
 try:
