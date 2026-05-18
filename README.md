@@ -11,24 +11,19 @@ Variable Monitoring Logger(VML)는 Python 프로그램 실행 중
 
 ## Overview
 
-Python 코드에서 변수의 상태 변화를 확인하려면 일반적으로
-출력문을 추가하거나 디버거를 사용해야 합니다.
-이 방식은 코드 가독성을 해치고, 실행 흐름을 방해하며,
-규모가 커질수록 유지보수가 어려워집니다.
+Python 코드에서 변수의 상태 변화를 확인하려면 일반적으로 출력문을 추가하거나 디버거를 사용해야 합니다. 하지만 이 방식은 코드 가독성을 해치고, 실행 흐름을 방해하며, 시스템 규모가 커질수록 유지보수를 어렵게 만듭니다.
 
-VML은 이러한 문제를 해결하기 위해
-변수의 변경 여부를 자동으로 감지하고
-프로그램 종료 시 로그 파일로 기록하는 방식을 제공합니다.
+VML은 이러한 문제를 해결하기 위해 변수의 변경 여부를 백그라운드에서 자동으로 감지하고, 프로그램 종료 시 그 이력을 로그 파일로 안전하게 기록하는 솔루션을 제공합니다.
 
 ---
 
 ## Features
 
-- 코드 수정 없이 변수 변경 자동 추적
-- C Extension 기반 참조/값 비교로 Python-level 비교 오버헤드 최소화
-- 메모리 버퍼 기반 로그 수집으로 I/O 최소화
-- 실행 종료 시 자동 로그 파일 생성
-- 다수의 변수 모니터링에도 안정적인 성능 유지
+- **무결성 유지:** 별도의 로그 함수 호출 등 복잡한 코드 수정 없이 변수 변경 자동 추적
+- **고성능 로깅:** C Extension 기반의 참조 및 값 비교 연산으로 Python 레벨의 오버헤드 최소화
+- **I/O 최적화:** 메모리 버퍼(`HistoryBuffer`) 기반 로그 수집으로 잦은 디스크 접근(I/O) 방지
+- **안전한 기록:** 프로세스 실행 종료 시(`atexit`) 자동으로 JSONL 형식의 로그 파일 생성
+- **Fail-Fast 설계:** C 엔진 누락 시 즉각적인 예외 처리를 통한 견고한 실행 환경 보장
 
 ---
 
@@ -37,16 +32,16 @@ VML은 이러한 문제를 해결하기 위해
 VML 라이브러리만 불러오면 별도의 설정 없이 사용할 수 있습니다.
 
 ```python
-from vml import vml
+import vml
 
 A = [1, 2, 3]
 monitor_A = vml("A")
 ```
-monitor_A 객체는 별도로 사용하지 않아도 되며, 생명주기 동안 자동으로 추적됩니다.
+생성된 monitor_A 객체는 별도로 조작할 필요가 없으며, 변수의 생명주기 동안 내부 엔진이 자동으로 변경 사항을 추적합니다.
 
-- 별도의 로그 함수 호출 불필요
-- 변수 값이 변경되면 자동으로 기록
-- 기존 Python 문법 및 실행 흐름 유지
+변수 값이 변경되면 버퍼에 자동으로 기록됩니다.
+
+기존 Python 문법과 런타임 실행 흐름을 100% 유지합니다.
 
 ---
 
@@ -131,6 +126,7 @@ C 컴파일러 (GCC, Clang, MSVC 등)
 제공된 테스트 코드를 실행하고자 하는 경우, 다음과 같은 명령어로 설치하면 됩니다.
 
 ```bash
+#개발자 모드 설치 (C Extension 모듈 빌드 포함)
 $ pip install -e .
 ```
 
@@ -140,12 +136,12 @@ $ pip install -e .
 $ python setup.py build_ext --inplace
 ```
 
-단순히 패키지 사용만을 원하는 것이라면 다음 명령어로 설치하면 됩니다.
+일반 패키지 설치만을 원하는 것이라면 다음 명령어로 설치하면 됩니다.
 ```bash
 $ pip install .
 ```
 
-설치 후, tests/test.py를 실행하여 테스트를 진행할 수 있습니다.
+설치 후 tests/test.py를 실행하여 테스트를 진행할 수 있습니다.
 ```bash
 --- VML Package Test ---
 Module import successful.
@@ -173,19 +169,24 @@ All Tests Passed
 ```bash
 .
 ├── .gitignore
-├── LICENSE              # MIT LICENSE
+├── LICENSE                      # MIT LICENSE
 ├── README.md
-├── pyproject.toml       # 빌드 및 배포 설정
+├── pyproject.toml
 ├── setup.py
-├── tests/               # 유닛 테스트 폴더
+├── tests/
 │   ├── test.py
-│   ├── test_vml_engine.py
-│   └── test_logger.py
+│   ├── test_logger.py
+│   └── test_vml_engine.py
 └── src/
-    └── vml/              # VML 패키지
-        ├── __init__.py
-        ├── logger.py     # VML Class
-        └── vml_engine.c  # 변수 비교 함수
+    └── vml/                     # VML Package
+        ├── __init__.py
+        ├── vml.py               # VML 메인 모듈 및 진입점
+        ├── FileWriter.py        # File I/O
+        ├── HistoryBuffer.py     # 메모리 버퍼 관리
+        ├── ScopeResolver.py     # 변수 스코프(Local/Global) 탐색
+        ├── TraceDispatcher.py   # 시스템 Trace 이벤트 라우팅
+        ├── VariableTracker.py   # 개별 변수 상태 추적기
+        └── vml_engine.c         # C Extension 변수 비교 엔진
 ```
 
 ---
