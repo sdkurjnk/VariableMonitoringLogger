@@ -20,23 +20,9 @@ static PyObject *vml_check_variable(PyObject *self, PyObject *args)
 
     // LOCAL인지 GLOBAL인지에 따라 프레임에서 가져옴
     if (domain == LOCAL) {
-<<<<<<< HEAD
-        PyObject *locals = PyFrame_GetLocals((PyFrameObject *)frame);
-        if (locals) {
-            reference_curr = PyObject_GetItem(locals, key);
-            Py_XDECREF(locals);
-        }
-    } else {
-        PyObject *globals = PyFrame_GetGlobals((PyFrameObject *)frame);
-        if (globals) {
-            reference_curr = PyObject_GetItem(globals, key);
-            Py_XDECREF(globals);
-        }
-=======
         scope_dict = PyFrame_GetLocals((PyFrameObject *)frame);
     } else {
         scope_dict = PyFrame_GetGlobals((PyFrameObject *)frame);
->>>>>>> master
     }
 
     if (scope_dict) {
@@ -60,11 +46,7 @@ static PyObject *vml_check_variable(PyObject *self, PyObject *args)
 
     // Step2 : Checking reference in Stack
     if (reference_curr != reference_prev) {
-<<<<<<< HEAD
         Py_DECREF(reference_curr);
-=======
-        Py_DECREF(reference_curr); // 일괄적인 참조 카운트 해제
->>>>>>> master
         Py_RETURN_TRUE;
     }
 
@@ -74,21 +56,14 @@ static PyObject *vml_check_variable(PyObject *self, PyObject *args)
         PyFloat_Check(reference_curr) || 
         PyBool_Check(reference_curr) || 
         reference_curr == Py_None) {
-<<<<<<< HEAD
-        Py_DECREF(reference_curr);
-=======
         Py_DECREF(reference_curr); 
->>>>>>> master
         Py_RETURN_FALSE; 
     }
 
     // Step4 : Checking Data in Heap
     int diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
     Py_DECREF(reference_curr);
-<<<<<<< HEAD
-=======
     
->>>>>>> master
     if (diff == 1) {
         Py_RETURN_TRUE;
     } else if (diff == -1) {
