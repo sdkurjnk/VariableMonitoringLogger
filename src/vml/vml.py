@@ -26,9 +26,6 @@ class VML:
         return self
 
     def _finalSave(self):
-        self._final_save()
-
-    def _final_save(self):
         if self._saved:
             return
         self.dispatcher.stop()

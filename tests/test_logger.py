@@ -27,7 +27,7 @@ def test_vml_package():
     data_target.append(300) 
     data_target = "String Assignment"
     
-    monitor._final_save()
+    monitor._finalSave()
 
     if os.path.exists(log_name):
         with open(log_name, "r", encoding="utf-8") as f:

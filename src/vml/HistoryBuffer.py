@@ -1,6 +1,5 @@
 import copy
 
-
 class HistoryBuffer:
     def __init__(self):
         self._history = []
