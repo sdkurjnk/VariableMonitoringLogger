@@ -8,6 +8,8 @@ except ImportError:
 LOCAL = 0
 GLOBAL = 1
 
+_ATOMIC_TYPES = (int, float, bool, str, bytes, type(None))
+
 class VariableTracker:
 
     def __init__(self, varName, domain=None, value=None, exists=False, frame=None):
@@ -24,6 +26,20 @@ class VariableTracker:
             self._isActive = True
 
     def _make_snapshot(self, value):
+        if isinstance(value, _ATOMIC_TYPES):
+            return value
+        t = type(value)
+
+        if t is list:
+            return [self._make_snapshot(v) for v in value]
+        if t is dict:
+            return {self._make_snapshot(k): self._make_snapshot(v) for k, v in value.items()}
+        if t is set:
+            return {self._make_snapshot(v) for v in value}
+        if t is frozenset:
+            return frozenset(self._make_snapshot(v) for v in value)
+        if t is tuple:
+            return tuple(self._make_snapshot(v) for v in value)
         try:
             return copy.deepcopy(value)
         except Exception:
