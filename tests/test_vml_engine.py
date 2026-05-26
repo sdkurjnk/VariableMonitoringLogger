@@ -1,64 +1,62 @@
-import sys
-import os
 import copy
+import sys
+import unittest
+
+from vml import vml_engine
 
 
-def run_engine_test():
+class TestVMLEngine(unittest.TestCase):
 
-    print("\n--- vml_engine Logic Test ---")
-    
-    vml_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "vml"))
-    if vml_dir not in sys.path:
-        sys.path.insert(0, vml_dir)
+    def test_returns_none_when_variable_does_not_exist(self):
+        frame = sys._getframe()
 
-    try:
-        import vml_engine
-    except ImportError as e:
-        print(f"Failed to import vml_engine: {e}")
-        sys.exit(0)
-    print("Module import successful.")
-    
-    frame = sys._getframe()
-    results = []
-    
-    # 1. Test: Existence Check
-    res_existence = vml_engine.check_variable(frame, None, None, 0, "undefined_var")
-    test1 = res_existence is None
-    results.append(test1)
-    print(f"Test 1 (Existence): {res_existence} -> {'Pass' if test1 else 'Fail'}")
+        result = vml_engine.check_variable(
+            frame, None, None, 0, "undefined_var"
+        )
 
-    # 2. Test: No Change
-    sample_list = [1, 2, 3]
-    copy_val = copy.deepcopy(sample_list)
-    res_no_change = vml_engine.check_variable(frame, sample_list, copy_val, 0, "sample_list")
-    test2 = res_no_change is False
-    results.append(test2)
-    print(f"Test 2 (No Change): {res_no_change} -> {'Pass' if test2 else 'Fail'}")
+        self.assertIsNone(result)
 
-    # 3. Test: Reference Change (Stack)
-    prev_ref = sample_list
-    prev_copy = copy.deepcopy(sample_list)
-    sample_list = [1, 2, 3]
-    res_stack = vml_engine.check_variable(frame, prev_ref, prev_copy, 0, "sample_list")
-    test3 = res_stack is True
-    results.append(test3)
-    print(f"Test 3 (Stack/Ref): {res_stack} -> {'Pass' if test3 else 'Fail'}")
+    def test_returns_false_when_value_does_not_change(self):
+        sample_list = [1, 2, 3]
+        previous_reference = sample_list
+        previous_snapshot = copy.deepcopy(sample_list)
 
-    # 4. Test: Data Change (Heap)
-    mutable_obj = [10, 20]
-    old_ref = mutable_obj
-    old_snapshot = copy.deepcopy(mutable_obj)
-    
-    mutable_obj.append(30)
-    res_heap = vml_engine.check_variable(frame, old_ref, old_snapshot, 0, "mutable_obj")
-    test4 = res_heap is True
-    results.append(test4)
-    print(f"Test 4 (Heap/Data): {res_heap} -> {'Pass' if test4 else 'Fail'}")
+        frame = sys._getframe()
 
-    if all(results):
-        print("\nAll Tests Passed")
-    else:
-        print("\nSome Tests Failed")
+        result = vml_engine.check_variable(
+            frame, previous_reference, previous_snapshot, 0, "sample_list"
+        )
+
+        self.assertIs(result, False)
+
+    def test_returns_true_when_reference_changes(self):
+        sample_list = [1, 2, 3]
+        previous_reference = sample_list
+        previous_snapshot = copy.deepcopy(sample_list)
+
+        sample_list = [1, 2, 3]
+        frame = sys._getframe()
+
+        result = vml_engine.check_variable(
+            frame, previous_reference, previous_snapshot, 0, "sample_list"
+        )
+
+        self.assertIs(result, True)
+
+    def test_returns_true_when_mutable_data_changes(self):
+        mutable_obj = [10, 20]
+        previous_reference = mutable_obj
+        previous_snapshot = copy.deepcopy(mutable_obj)
+
+        mutable_obj.append(30)
+        frame = sys._getframe()
+
+        result = vml_engine.check_variable(
+            frame, previous_reference, previous_snapshot, 0, "mutable_obj"
+        )
+
+        self.assertIs(result, True)
+
 
 if __name__ == "__main__":
-    run_engine_test()
+    unittest.main(verbosity=2)
