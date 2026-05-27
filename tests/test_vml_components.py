@@ -35,6 +35,17 @@ class TestVMLComponents(unittest.TestCase):
 
         buffer.append("A", 10, "init", 0, 1)
         buffer.append("A", 20, "updated", 0, 2)
+
+        history = buffer.getHistory()
+
+        self.assertEqual(
+            history,
+            [
+                {"name": "A", "data": 10, "event": "init", "domain": "LOCAL", "line": 1},
+                {"name": "A", "data": 20, "event": "updated", "domain": "LOCAL", "line": 2},
+            ],
+        )
+
         buffer.clearBuffer()
 
         self.assertEqual(buffer.getHistory(), [])
