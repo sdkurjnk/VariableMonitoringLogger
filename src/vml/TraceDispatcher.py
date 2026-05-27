@@ -67,6 +67,7 @@ class TraceDispatcher:
 
             if event_name in ("init", "updated", "deleted") and self._bufferRef is not None:
                 data = None if event_name == "deleted" else tracker.get_snapshot()
-                self._bufferRef.append(tracker.varName, data, event_name, domain, frame.f_lineno)
+                logged_domain = tracker.domain if event_name == "deleted" and domain not in (0, 1) else domain
+                self._bufferRef.append(tracker.varName, data, event_name, logged_domain, frame.f_lineno)
 
         return self._trace_lines
