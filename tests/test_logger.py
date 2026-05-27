@@ -1,54 +1,64 @@
-import vml
-import os
 import json
-import sys
+import os
+import tempfile
+import unittest
 
-def test_vml_package():
-    log_name = "vml_package_test.jsonl"
-    
-    if os.path.exists(log_name):
-        os.remove(log_name)
+import vml
 
-    print("\n--- VML Package Test ---")
-    
-    try:
-        import vml
-        print("Module import successful.")
-    except ImportError as e:
-        print(f"Failed to import vml: {e}")
-        sys.exit(0)
 
-    results_check = []
+def read_jsonl(filename):
+    with open(filename, "r", encoding="utf-8") as f:
+        return [json.loads(line) for line in f]
 
-    data_target = [100, 200]
 
-    monitor = vml.logger("data_target", filename=log_name)
-    
-    data_target.append(300) 
-    data_target = "String Assignment"
-    
-    monitor._finalSave()
+class TestVMLLoggerPackage(unittest.TestCase):
 
-    if os.path.exists(log_name):
-        with open(log_name, "r", encoding="utf-8") as f:
-            logs = [json.loads(line) for line in f]
-            
-        print(f"Captured Events: {len(logs)}")
-        for i, entry in enumerate(logs):
-            print(f"Event {i} [{entry['event']}]: {entry['data']}")
+    def test_package_imports_public_api(self):
+        self.assertTrue(hasattr(vml, "logger"))
+        self.assertTrue(hasattr(vml, "VML"))
 
-        test_passed = len(logs) >= 3
-        results_check.append(test_passed)
+    def test_logger_writes_init_and_update_events(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, "vml_package_test.jsonl")
 
-        if all(results_check):
-            print("\nAll Tests Passed")
-        else:
-            print(f"\nSome Tests Failed. Log not found at {log_name}")
-    else:
-        print(f"\nFail: Log not found at {log_name}")
-    
-    if os.path.exists(log_name):
-        os.remove(log_name)
+            data_target = [100, 200]
+            monitor = vml.logger("data_target", filename=filename)
+
+            data_target.append(300)
+
+            checkpoint = "after append"
+            self.assertEqual(checkpoint, "after append")
+
+            monitor._finalSave()
+            logs = read_jsonl(filename)
+
+        self.assertEqual(logs[0]["event"], "init")
+        self.assertEqual(logs[0]["data"], [100, 200])
+
+        self.assertEqual(logs[-1]["event"], "updated")
+        self.assertEqual(logs[-1]["data"], [100, 200, 300])
+
+    def test_logger_writes_deleted_event(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, "vml_deleted_test.jsonl")
+
+            data_target = [100, 200]
+            monitor = vml.logger("data_target", filename=filename)
+
+            del data_target
+
+            checkpoint = "after delete"
+            self.assertEqual(checkpoint, "after delete")
+
+            monitor._finalSave()
+            logs = read_jsonl(filename)
+
+        self.assertEqual(logs[0]["event"], "init")
+
+        deleted_logs = [entry for entry in logs if entry["event"] == "deleted"]
+        self.assertGreaterEqual(len(deleted_logs), 1)
+        self.assertIsNone(deleted_logs[-1]["data"])
+
 
 if __name__ == "__main__":
-    test_vml_package()
+    unittest.main(verbosity=2)
