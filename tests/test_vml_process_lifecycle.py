@@ -164,7 +164,7 @@ class TestVMLProcessLifecycle(unittest.TestCase):
         self.assertGreaterEqual(len(logs), 2)
 
         for entry in logs:
-            self.assertEqual(set(entry.keys()), {"name", "data", "event"})
+            self.assertEqual(set(entry.keys()), {"name", "data", "event", "domain", "line"})
             self.assertEqual(entry["name"], "target")
             self.assertIn(entry["event"], {"init", "updated", "deleted"})
 
