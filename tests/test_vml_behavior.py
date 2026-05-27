@@ -150,9 +150,11 @@ class TestVMLBehavior(unittest.TestCase):
         self.assertGreaterEqual(len(logs), 2)
 
         for entry in logs:
-            self.assertEqual(set(entry.keys()), {"name", "data", "event"})
+            self.assertEqual(set(entry.keys()), {"name", "data", "event", "domain", "line"})
             self.assertEqual(entry["name"], "target")
             self.assertIn(entry["event"], {"init", "updated", "deleted"})
+            self.assertIn(entry["domain"], {"LOCAL", "GLOBAL"})
+            self.assertTrue(entry["line"] is None or isinstance(entry["line"], int))
 
 
 if __name__ == "__main__":

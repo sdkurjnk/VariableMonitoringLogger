@@ -19,7 +19,7 @@ class TestVMLComponents(unittest.TestCase):
         buffer = HistoryBuffer()
         original_data = {"numbers": [1, 2, 3]}
 
-        buffer.append("target", original_data, "init")
+        buffer.append("target", original_data, "init", 0, 1)
 
         history = buffer.getHistory()
         history[0]["data"]["numbers"].append(4)
@@ -33,8 +33,19 @@ class TestVMLComponents(unittest.TestCase):
     def test_history_buffer_clear(self):
         buffer = HistoryBuffer()
 
-        buffer.append("A", 10, "init")
-        buffer.append("A", 20, "updated")
+        buffer.append("A", 10, "init", 0, 1)
+        buffer.append("A", 20, "updated", 0, 2)
+
+        history = buffer.getHistory()
+
+        self.assertEqual(
+            history,
+            [
+                {"name": "A", "data": 10, "event": "init", "domain": "LOCAL", "line": 1},
+                {"name": "A", "data": 20, "event": "updated", "domain": "LOCAL", "line": 2},
+            ],
+        )
+
         buffer.clearBuffer()
 
         self.assertEqual(buffer.getHistory(), [])
