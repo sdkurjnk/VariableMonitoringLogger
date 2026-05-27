@@ -7,7 +7,6 @@ TEST_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = TEST_DIR.parent
 SRC_DIR = PROJECT_ROOT / "src"
 
-
 if __name__ == "__main__":
     sys.path.insert(0, str(SRC_DIR))
     sys.path.insert(0, str(TEST_DIR))
