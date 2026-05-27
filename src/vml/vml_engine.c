@@ -60,10 +60,48 @@ static PyObject *vml_check_variable(PyObject *self, PyObject *args)
         Py_RETURN_FALSE; 
     }
 
-    // Step4 : Checking Data in Heap
-    int diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
+    // Step4 : Checking Data in Heap (type-specific fast-path)
+    int diff = 0;
+
+    if (PyList_Check(reference_curr)) {
+        // Fast-path : size check first
+        if (PyList_GET_SIZE(reference_curr) != PyList_GET_SIZE(last_val_copy)) {
+            Py_DECREF(reference_curr);
+            Py_RETURN_TRUE;
+        }
+        diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
+    }
+    else if (PyDict_Check(reference_curr)) {
+        // Fast-path : size check first
+        if (PyDict_Size(reference_curr) != PyDict_Size(last_val_copy)) {
+            Py_DECREF(reference_curr);
+            Py_RETURN_TRUE;
+        }
+        diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
+    }
+    else if (PySet_Check(reference_curr) || PyFrozenSet_Check(reference_curr)) {
+        // Fast-path : size check first
+        if (PySet_GET_SIZE(reference_curr) != PySet_GET_SIZE(last_val_copy)) {
+            Py_DECREF(reference_curr);
+            Py_RETURN_TRUE;
+        }
+        diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
+    }
+    else if (PyTuple_Check(reference_curr)) {
+        // Fast-path : size check first (tuple containing mutable elements)
+        if (PyTuple_GET_SIZE(reference_curr) != PyTuple_GET_SIZE(last_val_copy)) {
+            Py_DECREF(reference_curr);
+            Py_RETURN_TRUE;
+        }
+        diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
+    }
+    else {
+        // Fallback : custom class or unknown type
+        diff = PyObject_RichCompareBool(reference_curr, last_val_copy, Py_NE);
+    }
+
     Py_DECREF(reference_curr);
-    
+
     if (diff == 1) {
         Py_RETURN_TRUE;
     } else if (diff == -1) {
