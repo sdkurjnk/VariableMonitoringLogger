@@ -6,7 +6,7 @@ class HistoryBuffer:
 
     _DOMAIN_LABELS = {0: "LOCAL", 1: "GLOBAL"}
 
-    def append(self, name, data, event, domain, line):
+    def append(self, name, data, event, domain=None, line=None):
         self._history.append({"name" : name, "data" : data, "event" : event, "domain" : self._DOMAIN_LABELS.get(domain, domain), "line" : line})
 
     def getHistory(self):
