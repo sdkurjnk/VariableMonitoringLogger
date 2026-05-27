@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vml"
-version = "1.2.1"
+version = "1.2.0"
 authors = [{name = "sdkurjnk", email = "sdkurjnk@naver.com"}]
 license = {text = "MIT"}
 description = "A Variable Monitoring Logger with C-Engine"
