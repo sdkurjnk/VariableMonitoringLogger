@@ -1,3 +1,5 @@
+import copy
+
 class HistoryBuffer:
     def __init__(self):
         self._history = []
@@ -6,7 +8,7 @@ class HistoryBuffer:
         self._history.append({"name" : name, "data" : data, "event" : event})
 
     def getHistory(self):
-        return self._history.copy()
+        return copy.deepcopy(self._history)
 
     def clearBuffer(self):
         self._history.clear()
