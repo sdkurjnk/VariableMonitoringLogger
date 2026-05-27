@@ -23,7 +23,7 @@ class TraceDispatcher:
         self._trackers.append(tracker)
 
         if domain in (0, 1) and self._bufferRef is not None:
-            self._bufferRef.append(varName, tracker.get_snapshot(), "init")
+            self._bufferRef.append(varName, tracker.get_snapshot(), "init", domain, frame.f_lineno if frame is not None else None)
 
         if not self._is_tracing:
             sys.settrace(self._trace_calls)
@@ -67,6 +67,6 @@ class TraceDispatcher:
 
             if event_name in ("init", "updated", "deleted") and self._bufferRef is not None:
                 data = None if event_name == "deleted" else tracker.get_snapshot()
-                self._bufferRef.append(tracker.varName, data, event_name)
+                self._bufferRef.append(tracker.varName, data, event_name, domain, frame.f_lineno)
 
         return self._trace_lines
