@@ -1,7 +1,10 @@
 import json
 
+
 class FileWriter:
     def write(self, filename, history):
-        with open(filename, 'w', encoding='utf-8') as f:
+        with open(filename, "w", encoding="utf-8") as file:
             for entry in history:
-                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+                # Write each history entry as one JSONL record.
+                json_line = json.dumps(entry, ensure_ascii=False)
+                file.write(json_line + "\n")
