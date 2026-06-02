@@ -5,14 +5,21 @@ import unittest
 
 import vml
 
+EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line"}
+TRACKING_EVENTS = {"init", "updated", "deleted"}
+TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
 
 def read_jsonl(filename):
-    with open(filename, "r", encoding="utf-8") as f:
-        return [json.loads(line) for line in f]
+    # Read VML output as JSONL, where each line is one log entry.
+    with open(filename, "r", encoding="utf-8") as file:
+        return [json.loads(line) for line in file]
 
+def finalize_and_read_logs(monitor, filename):
+    # Force VML to flush tracked events before assertions inspect the log file.
+    monitor._finalSave()
+    return read_jsonl(filename)
 
 class TestVMLBehavior(unittest.TestCase):
-
     def test_tracks_list_append_without_manual_logging(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "list_append.jsonl")
@@ -22,16 +29,14 @@ class TestVMLBehavior(unittest.TestCase):
 
             target.append(3)
 
-            # line tracing shold capture this change
+            # Trigger another traced line so VML can observe the in-place mutation.
             checkpoint = "after append"
             self.assertEqual(checkpoint, "after append")
 
-            monitor._finalSave()
-            logs = read_jsonl(filename)
+            logs = finalize_and_read_logs(monitor, filename)
 
         self.assertEqual(logs[0]["event"], "init")
         self.assertEqual(logs[0]["data"], [1, 2])
-
         self.assertIn("updated", [entry["event"] for entry in logs])
         self.assertEqual(logs[-1]["data"], [1, 2, 3])
 
@@ -45,11 +50,11 @@ class TestVMLBehavior(unittest.TestCase):
             target["count"] = 2
             target["items"].append("B")
 
+            # Keep execution in the same test frame so line tracing can run.
             checkpoint = "after dict mutation"
             self.assertEqual(checkpoint, "after dict mutation")
 
-            monitor._finalSave()
-            logs = read_jsonl(filename)
+            logs = finalize_and_read_logs(monitor, filename)
 
         updated_logs = [entry for entry in logs if entry["event"] == "updated"]
 
@@ -65,15 +70,14 @@ class TestVMLBehavior(unittest.TestCase):
 
             target = "after"
 
+            # Reassignment is detected on a later traced line in this frame.
             checkpoint = "after reassignment"
             self.assertEqual(checkpoint, "after reassignment")
 
-            monitor._finalSave()
-            logs = read_jsonl(filename)
+            logs = finalize_and_read_logs(monitor, filename)
 
         self.assertEqual(logs[0]["event"], "init")
         self.assertEqual(logs[0]["data"], "before")
-
         self.assertEqual(logs[-1]["event"], "updated")
         self.assertEqual(logs[-1]["data"], "after")
 
@@ -86,15 +90,15 @@ class TestVMLBehavior(unittest.TestCase):
 
             del target
 
+            # The extra line gives the trace dispatcher a chance to record deletion.
             checkpoint = "after delete"
             self.assertEqual(checkpoint, "after delete")
 
-            monitor._finalSave()
-            logs = read_jsonl(filename)
-
-        self.assertEqual(logs[0]["event"], "init")
+            logs = finalize_and_read_logs(monitor, filename)
 
         deleted_logs = [entry for entry in logs if entry["event"] == "deleted"]
+
+        self.assertEqual(logs[0]["event"], "init")
         self.assertGreaterEqual(len(deleted_logs), 1)
         self.assertIsNone(deleted_logs[-1]["data"])
 
@@ -112,11 +116,11 @@ class TestVMLBehavior(unittest.TestCase):
             first.append(2)
             second = "beta"
 
+            # Both variables should be checked during the same traced frame.
             checkpoint = "after multiple updates"
             self.assertEqual(checkpoint, "after multiple updates")
 
-            monitor._finalSave()
-            logs = read_jsonl(filename)
+            logs = finalize_and_read_logs(monitor, filename)
 
         first_logs = [entry for entry in logs if entry["name"] == "first"]
         second_logs = [entry for entry in logs if entry["name"] == "second"]
@@ -141,21 +145,20 @@ class TestVMLBehavior(unittest.TestCase):
 
             target["status"] = "done"
 
+            # Capture at least one update before validating the persisted schema.
             checkpoint = "after schema update"
             self.assertEqual(checkpoint, "after schema update")
 
-            monitor._finalSave()
-            logs = read_jsonl(filename)
+            logs = finalize_and_read_logs(monitor, filename)
 
         self.assertGreaterEqual(len(logs), 2)
 
         for entry in logs:
-            self.assertEqual(set(entry.keys()), {"name", "data", "event", "domain", "line"})
+            self.assertEqual(set(entry.keys()), EXPECTED_LOG_KEYS)
             self.assertEqual(entry["name"], "target")
-            self.assertIn(entry["event"], {"init", "updated", "deleted"})
-            self.assertIn(entry["domain"], {"LOCAL", "GLOBAL"})
+            self.assertIn(entry["event"], TRACKING_EVENTS)
+            self.assertIn(entry["domain"], TRACKING_DOMAINS)
             self.assertTrue(entry["line"] is None or isinstance(entry["line"], int))
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
