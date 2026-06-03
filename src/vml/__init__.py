@@ -1,6 +1,7 @@
-from .vml import VML, logger
+from importlib.metadata import PackageNotFoundError, version
+
 from . import vml_engine
-from importlib.metadata import version, PackageNotFoundError
+from .vml import VML, logger
 
 try:
     __version__ = version("vml")
