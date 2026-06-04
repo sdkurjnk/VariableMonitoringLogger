@@ -7,8 +7,8 @@ from .ScopeResolver import ScopeResolver
 from .TraceDispatcher import TraceDispatcher
 
 
-class VML:
-    def __init__(self, fileName="vml_log.json"):
+class VMlog:
+    def __init__(self, fileName="vmlog.json"):
         self.fileName = fileName
         self.buffer = HistoryBuffer()
         self.dispatcher = TraceDispatcher(self.buffer)
@@ -47,7 +47,7 @@ class VML:
         self.fileWriter.write(self.fileName, self.buffer.getHistory())
 
 
-def logger(varName, filename="vml_log.json"):
+def logger(varName, filename="vmlog.json"):
     # Create a monitor and register the variable from the caller's frame.
-    monitor = VML(filename)
+    monitor = VMlog(filename)
     return monitor.logger(varName, sys._getframe(1))

@@ -2,13 +2,13 @@ import copy
 import sys
 import unittest
 
-from vml import vml_engine
+from vmlog import vmlog_engine
 
 LOCAL = 0
 
 def check_local_variable(frame, previous_reference, previous_snapshot, variable_name):
     # Ask the native engine to compare a local variable in the provided frame.
-    return vml_engine.check_variable(
+    return vmlog_engine.check_variable(
         frame,
         previous_reference,
         previous_snapshot,
@@ -16,7 +16,7 @@ def check_local_variable(frame, previous_reference, previous_snapshot, variable_
         variable_name,
     )
 
-class TestVMLEngine(unittest.TestCase):
+class TestVMlogEngine(unittest.TestCase):
     def test_returns_none_when_variable_does_not_exist(self):
         frame = sys._getframe()
 

@@ -3,14 +3,14 @@ import os
 import tempfile
 import unittest
 
-import vml
+import vmlog
 
 GLOBAL_COLLISION_VALUE = "global-value"
 INIT_EVENT = "init"
 UPDATED_EVENT = "updated"
 
 def read_jsonl(filename):
-    # Read VML output as JSONL, where each line contains one log entry.
+    # Read VMlog output as JSONL, where each line contains one log entry.
     with open(filename, "r", encoding="utf-8") as file:
         return [json.loads(line) for line in file]
 
@@ -27,13 +27,13 @@ def get_latest_entries_by_name(logs):
 
     return latest_by_name
 
-class TestVMLEdgeCases(unittest.TestCase):
+class TestVMlogEdgeCases(unittest.TestCase):
     def test_no_duplicate_update_when_value_does_not_change(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "no_duplicate.jsonl")
 
             target = [1, 2, 3]
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             # Run several traced lines without changing the tracked value.
             checkpoint_one = "line one"
@@ -60,7 +60,7 @@ class TestVMLEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "nested_mutable.jsonl")
 
             target = {"users": [{"name": "Alice", "score": 10}]}
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target["users"][0]["score"] = 20
 
@@ -81,7 +81,7 @@ class TestVMLEdgeCases(unittest.TestCase):
 
             def run_local_scope():
                 target_name_collision = "local-value"
-                monitor = vml.logger("target_name_collision", filename=filename)
+                monitor = vmlog.logger("target_name_collision", filename=filename)
 
                 target_name_collision = "local-updated"
 
@@ -105,7 +105,7 @@ class TestVMLEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "stop_tracking.jsonl")
 
             target = [1]
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target.append(2)
 
@@ -137,7 +137,7 @@ class TestVMLEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "unicode.jsonl")
 
             target = {"message": "안녕하세요", "status": "준비"}
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target["status"] = "완료"
 
@@ -158,7 +158,7 @@ class TestVMLEdgeCases(unittest.TestCase):
             number = 1.5
             values = (1, 2)
 
-            monitor = vml.VML(filename)
+            monitor = vmlog.VMlog(filename)
             monitor.logger("flag")
             monitor.logger("number")
             monitor.logger("values")
