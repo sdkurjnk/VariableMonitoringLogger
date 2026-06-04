@@ -74,7 +74,7 @@ static int compare_mutable_value(PyObject *current_value, PyObject *previous_sna
     return PyObject_RichCompareBool(current_value, previous_snapshot, Py_NE);
 }
 
-static PyObject *vml_check_variable(PyObject *self, PyObject *args)
+static PyObject *vmlog_check_variable(PyObject *self, PyObject *args)
 {
     PyObject *frame;
     PyObject *reference_prev;
@@ -129,19 +129,19 @@ static PyObject *vml_check_variable(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef VmlMethods[] = {
-    {"check_variable", vml_check_variable, METH_VARARGS, "Check variable status"},
+    {"check_variable", vmlog_check_variable, METH_VARARGS, "Check variable status"},
     {NULL, NULL, 0, NULL}
 };
 
 static struct PyModuleDef vmlmodule = {
     PyModuleDef_HEAD_INIT,
-    "vml_engine",
+    "vmlog_engine",
     NULL,
     -1,
     VmlMethods
 };
 
-PyMODINIT_FUNC PyInit_vml_engine(void)
+PyMODINIT_FUNC PyInit_vmlog_engine(void)
 {
     return PyModule_Create(&vmlmodule);
 }

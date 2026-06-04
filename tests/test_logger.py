@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-import vml
+import vmlog
 
 INIT_EVENT = "init"
 UPDATED_EVENT = "updated"
@@ -21,15 +21,15 @@ def finalize_and_read_logs(monitor, filename):
 
 class TestVMLLoggerPackage(unittest.TestCase):
     def test_package_imports_public_api(self):
-        self.assertTrue(hasattr(vml, "logger"))
-        self.assertTrue(hasattr(vml, "VML"))
+        self.assertTrue(hasattr(vmlog, "logger"))
+        self.assertTrue(hasattr(vmlog, "VMlog"))
 
     def test_logger_writes_init_and_update_events(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "vml_package_test.jsonl")
 
             data_target = [100, 200]
-            monitor = vml.logger("data_target", filename=filename)
+            monitor = vmlog.logger("data_target", filename=filename)
 
             data_target.append(300)
 
@@ -49,7 +49,7 @@ class TestVMLLoggerPackage(unittest.TestCase):
             filename = os.path.join(temp_dir, "vml_deleted_test.jsonl")
 
             data_target = [100, 200]
-            monitor = vml.logger("data_target", filename=filename)
+            monitor = vmlog.logger("data_target", filename=filename)
 
             del data_target
 

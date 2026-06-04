@@ -1,9 +1,9 @@
 import copy
 
 try:
-    from . import vml_engine
+    from . import vmlog_engine
 except ImportError:
-    raise RuntimeError("vml_engine C extension is not found.")
+    raise RuntimeError("vmlog_engine C extension is not found.")
 
 LOCAL = 0
 GLOBAL = 1
@@ -108,7 +108,7 @@ class VariableTracker:
             self._isActive = True
             return INIT_EVENT
 
-        result = vml_engine.check_variable(
+        result = vmlog_engine.check_variable(
             frame,
             self._lastRef,
             self._lastCopy,
