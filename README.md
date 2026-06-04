@@ -8,38 +8,44 @@
 
 ---
 
-## 개요
+## 1. Overview
 
-Python 코드에서 변수의 상태 변화를 확인하려면 일반적으로 `print`문을 추가하거나 디버거를 사용해야 합니다.  
-하지만 이 방식은 코드 가독성을 해치고, 실행 흐름을 방해하며, 시스템 규모가 커질수록 유지보수를 어렵게 만듭니다.
+대규모 시스템이나 복잡한 알고리즘을 디버깅할 때 변수의 상태 변화를 확인하는 것은 필수적입니다. 그러나 일반적인 디버깅 방식은 다음과 같은 한계를 가집니다:
+- **코드 오염:** 임시로 작성한 출력문(`print`)이 비즈니스 로직과 섞여 가독성을 해치고, 제거 누락 시 프로덕션 환경에 악영향을 줍니다.
+- **실행 흐름 방해:** 대화형 디버거(PDB, IDE 디버거)는 루프나 고빈도 함수 내에서 실행을 멈추기 때문에 전체적인 시스템의 런타임 흐름을 유기적으로 관찰하기 어렵습니다.
 
-**VML**은 이러한 문제를 해결하기 위해 변수의 변경 여부를 백그라운드에서 자동으로 감지하고,  
-프로그램 종료 시 그 이력을 JSONL 로그 파일로 안전하게 기록합니다.
-
----
-
-## 특징
-
-| 특징 | 설명 |
-|------|------|
-| **무결성 유지** | 별도의 로그 함수 호출 없이 변수 변경을 자동 추적 |
-| **고성능 로깅** | C Extension 기반의 참조 및 값 비교 연산으로 Python 레벨 오버헤드 최소화 |
-| **I/O 최적화** | 메모리 버퍼(`HistoryBuffer`) 기반 로그 수집으로 잦은 디스크 접근 방지 |
-| **안전한 기록** | 프로세스 종료 시(`atexit`) JSONL 형식의 로그 파일 자동 생성 |
-| **Fail-Fast 설계** | C 엔진 누락 시 즉각적인 예외 처리로 견고한 실행 환경 보장 |
+`vmlog`는 이러한 문제를 해결하기 위해 **런타임 오버헤드를 최소화한 백그라운드 실시간 변수 추적 아키텍처**를 제공합니다. 사용자는 소스 코드 오염 없이 변수의 변경 여부를 자동으로 감지하고, 프로그램이 종료되는 시점에 수집된 모든 이력을 안전하게 디스크에 저장할 수 있습니다.
 
 ---
 
-## 설치
+## 2. Features
 
+- **무결성 및 투명성 (Zero-Invasive):** 최초 등록 이후 별도의 로그 매크로나 로깅 함수를 반복 호출할 필요가 없습니다. Python 고유의 실행 문법과 흐름을 100% 유지하며 백그라운드에서 추적합니다.
+- **C Extension 기반 고성능 엔진:** 파이썬 레벨에서 매 라인마다 거대한 객체를 비교하는 비효율을 극복하기 위해, 가변/불변 객체 판별 및 메모리 참조·크기 비교 연산을 C 확장 모듈(`vmlog_engine`)로 처리하여 런타임 오버헤드를 극소화했습니다.
+- **지연 쓰기 기반 I/O 최적화:** 변수가 바뀔 때마다 디스크에 접근하는 대신, 스레드-세이프한 메모리 버퍼(`HistoryBuffer`)에 로그를 적재한 후 최종 시점에 일괄 파일로 출력하여 디스크 I/O 병목을 방지합니다.
+- **안전한 프로세스 생명주기 연동:** 프로그램이 정상 종료되거나 예기치 못한 예외로 중단되더라도, 내부 `atexit` 런타임 훅이 자동으로 트리거되어 유실 없이 파일 생성을 보장합니다.
+- **지능적 스코프 해석 (Scope Resolution):** 실행 프레임 분석기를 통해 동일한 이름의 로컬 변수와 글로벌 변수가 충돌하거나, 로컬 변수가 글로벌 변수를 가리는(Shadowing) 현상을 정확히 해석합니다.
+
+---
+
+## 3. Installation
+
+`vmlog`는 고성능 변수 비교를 위해 C 확장 모듈 컴파일이 필요합니다. 아래 명령어를 통해 환경에 맞게 설치할 수 있습니다.
+
+### 개발자 모드 설치 (추천)
+소스 코드를 수정하거나 테스트 슈트를 직접 구동하려는 경우, C 확장 모듈 빌드를 포함하여 편집 가능한 모드로 설치합니다:
 ```bash
-# 일반 설치
-pip install vmlog
-
-# 개발자 모드 설치 (C Extension 모듈 빌드 포함)
 pip install -e .
+```
 
-# C 확장 모듈 직접 빌드
+### 일반 패키지 설치
+빌드 후 현재 환경에 고정 설치하려는 경우
+```bash
+pip install .
+```
+
+### C 확장 모듈 직접 빌드
+```bash
 python setup.py build_ext --inplace
 ```
 
@@ -49,37 +55,51 @@ python setup.py build_ext --inplace
 
 ---
 
-## 사용법
+## 4. Usage
 
-### 단일 변수 추적
-
-```python
-import vml
-
-target = [1, 2, 3]
-monitor = vml.logger("target")
-
-target.append(4)
-target = "String Assignment"
-```
-
-### 여러 변수 동시 추적
+### 기본 사용법 (단일 변수 추적)
+vmlog.logger 함수에 추적하고자 하는 변수의 이름을 문자열로 전달합니다.
 
 ```python
-import vml
+import vmlog
 
-first = [1]
-second = "alpha"
+# 1. 추적 대상 변수 생성
+target_list = [100, 200]
 
-monitor = vml.VML("vml_log.jsonl")
-monitor.logger("first")
-monitor.logger("second")
+# 2. 감시 장치 등록 (이 시점에 'init' 이벤트가 기록됩니다)
+vmlog.logger("target_list")
 
-first.append(2)
-second = "beta"
+# 3. 변수 조작 (인플레이스 변경 및 재할당 모두 자동 감지)
+target_list.append(300)
+
+# 4. 변수 삭제 감지
+del target_list
+
+# 추가적인 라인이 실행되거나 프로그램이 종료될 때 상기 변경점들이 자동으로 기록됩니다.
 ```
 
-`vml.logger("변수명")` 또는 `VML` 인스턴스의 `.logger()` 메서드로 등록된 변수는 별도 조작 없이 생명주기 동안 자동으로 추적됩니다.  
+### 고급 사용법
+vmlog.VMlog 클래스를 인스턴스화하여 여러 개의 로컬/글로벌 변수를 동시에 모니터링하고 저장 파일명을 직접 지정할 수 있습니다.
+
+```python
+import vmlog
+
+# 커스텀 로그 파일명을 지정하여 모니터 인스턴스 생성
+monitor = vmlog.VMlog(fileName="analytics_dump.jsonl")
+
+user_score = 10
+active_items = ["potion", "shield"]
+
+# 복수의 변수를 하나의 모니터에 등록
+monitor.logger("user_score")
+monitor.logger("active_items")
+
+# 값 업데이트 진행
+user_score += 55
+active_items.append("sword")
+```
+
+`vmlog.logger("변수명")` 또는 `VMlog` 인스턴스의 `.logger()` 메서드로 등록된 변수는 별도 조작 없이 생명주기 동안 자동으로 추적됩니다.  
 기존 Python 문법과 런타임 실행 흐름을 100% 유지합니다.
 
 ---
@@ -108,7 +128,7 @@ second = "beta"
 
 ---
 
-## 아키텍처
+## 5. 아키텍처
 
 Python tracer를 통해 실행 흐름을 관찰하고, 변수 변경 여부 판단은 C 엔진에 위임하여 성능을 유지합니다.
 
@@ -116,45 +136,45 @@ Python tracer를 통해 실행 흐름을 관찰하고, 변수 변경 여부 판�
 sequenceDiagram
     autonumber
 
-    participant U as User Code
-    participant V as VML Library
-    participant S as Python System
-    participant C as C Engine
-    participant B as Memory Buffer
-    participant F as JSONL File
+    participant U as User Code (사용자)
+    participant V as vmlog (Python 라이브러리)
+    participant S as Python Subsystem (sys.settrace)
+    participant C as C Engine (vmlog_engine.c)
+    participant B as History Buffer (메모리 버퍼)
+    participant F as JSONL File (디스크 저장)
 
     Note over U, S: [1. 초기화 및 감시 장치 등록]
-    U->>V: vml.logger("변수명") 또는 VML().logger("변수명") 호출
-    V->>S: sys.settrace(TraceDispatcher._trace_calls) 등록
-    V->>S: atexit.register(VML._finalSave) 등록
-    V->>B: {name, data, event: "init", domain, line} 적재
-    V-->>U: 감시 준비 완료
+    U->>V: vmlog.logger("변수명") 호출
+    V->>V: ScopeResolver를 통해 최초 스코프(LOCAL/GLOBAL) 및 주소 분석
+    V->>B: 최초 상태 적재 {event: "init", data: 현재값}
+    V->>S: sys.settrace(TraceDispatcher) 글로벌 등록
+    V->>S: atexit.register(_finalSave) 프로세스 훅 등록
+    V-->>U: 감시 준비 완료 및 실행 재개
 
-    Note over U, C: [2. 변수 추적 및 변경 감지]
-    loop 코드 실행 중
-        U->>U: 코드 실행
-        S->>V: 현재 실행 라인 정보 전달 (line / return 이벤트)
-        V->>V: ScopeResolver로 변수 스코프(LOCAL/GLOBAL) 탐색
-        V->>C: vml_engine.check_variable(frame, lastRef, lastCopy, domain, varName)
-
-        alt 변경 감지 (True)
-            C-->>V: 참조 변경 또는 가변 객체 데이터 변경
-            V->>B: {name, data, event: "updated", domain, line} 적재
-            V->>V: _lastRef, _lastCopy 업데이트
-        else 변경 없음 (False)
-            C-->>V: 동일함 신호
-        else 변수 삭제 (None)
-            C-->>V: 삭제됨 신호
-            V->>B: {name, data: null, event: "deleted", domain, line} 적재
-            V->>V: _isActive = False
+    Note over U, C: [2. 라인 실행 및 실시간 변수 변경 검사]
+    loop 사용자 코드 실행 단계
+        U->>U: 코드 순차 실행 (예: 객체 변형, 재할당 등)
+        S->>V: 다음 행 실행 신호 전달 (f_trace 인터셉트)
+        V->>C: check_variable(프레임, 이전참조, 이전스냅샷, 스코프, 변수명) 호출
+        
+        alt C 엔진 검사 결과: 주소 변경 혹은 내부 값 변경 (Return True)
+            C-->>V: 변수 변경 확인 신호 리턴
+            V->>B: {event: "updated", data: 신규값, line: f_lineno} 적재
+            V->>V: VariableTracker 내부 스냅샷 및 참조 주소 갱신
+        else C 엔진 검사 결과: 변경 없음 (Return False)
+            C-->>V: 상태 유지 신호 리턴 (아무 작업 안 함 - 성능 보존)
+        else C 엔진 검사 결과: 변수 scope 내 부재 (Return None)
+            C-->>V: 변수 소멸 신호 리턴
+            V->>B: {event: "deleted", data: null, line: f_lineno} 적재
+            V->>V: 해당 변수 트래커 비활성화
         end
     end
 
-    Note over U, F: [3. 프로세스 종료 및 자동 저장]
-    U->>S: 프로그램 실행 완료 (종료 시그널)
-    S->>V: atexit 트리거 발생
-    V->>V: TraceDispatcher.stop() → sys.settrace(None)
-    V->>F: HistoryBuffer 데이터를 JSONL로 일괄 기록
+    Note over U, F: [3. 프로세스 종료 및 자동 플러시]
+    U->>S: 스크립트 실행 완료 혹은 인터럽트 발생 (종료)
+    S->>V: atexit 트리거 발동
+    V->>V: sys.settrace(None) 추적 해제 및 무한루프 방지
+    V->>F: FileWriter를 호출하여 Buffer 내의 수집 이력을 JSONL로 일괄 생성
 ```
 
 ---
@@ -177,15 +197,15 @@ sequenceDiagram
 │   ├── test_vml_engine.py           # C Extension 엔진 단위 테스트
 │   └── test_vml_process_lifecycle.py # atexit 기반 프로세스 생명주기 테스트
 └── src/
-    └── vml/                         # VML Package
+    └── vmlog/                       # VML Package
         ├── __init__.py              # 공개 API 노출 (VML, logger, vml_engine)
-        ├── vml.py                   # VML 메인 클래스 및 logger() 진입점
+        ├── vmlog.py                 # VML 메인 클래스 및 logger() 진입점
         ├── FileWriter.py            # JSONL 파일 I/O
         ├── HistoryBuffer.py         # 메모리 버퍼 관리 (domain, line 포함)
         ├── ScopeResolver.py         # 변수 스코프(LOCAL/GLOBAL) 탐색
         ├── TraceDispatcher.py       # 시스템 Trace 이벤트 라우팅 및 추적 관리
         ├── VariableTracker.py       # 개별 변수 상태 추적 및 스냅샷 관리
-        └── vml_engine.c             # C Extension 변수 비교 엔진
+        └── vmlog_engine.c             # C Extension 변수 비교 엔진
 ```
 
 ---
