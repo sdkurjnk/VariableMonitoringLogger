@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-import vml
+import vmlog
 
 EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line"}
 TRACKING_EVENTS = {"init", "updated", "deleted"}
@@ -25,7 +25,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "list_append.jsonl")
 
             target = [1, 2]
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target.append(3)
 
@@ -45,7 +45,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "dict_mutation.jsonl")
 
             target = {"count": 1, "items": ["A"]}
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target["count"] = 2
             target["items"].append("B")
@@ -66,7 +66,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "immutable_reassignment.jsonl")
 
             target = "before"
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target = "after"
 
@@ -86,7 +86,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "deleted_variable.jsonl")
 
             target = [10, 20]
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             del target
 
@@ -109,7 +109,7 @@ class TestVMLBehavior(unittest.TestCase):
             first = [1]
             second = "alpha"
 
-            monitor = vml.VML(filename)
+            monitor = vmlog.VMlog(filename)
             monitor.logger("first")
             monitor.logger("second")
 
@@ -141,7 +141,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "schema.jsonl")
 
             target = {"status": "ready"}
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target["status"] = "done"
 
