@@ -135,7 +135,7 @@ static PyMethodDef VmlMethods[] = {
 
 static struct PyModuleDef vmlmodule = {
     PyModuleDef_HEAD_INIT,
-    "vml_engine",
+    "vmlog_engine",
     NULL,
     -1,
     VmlMethods
