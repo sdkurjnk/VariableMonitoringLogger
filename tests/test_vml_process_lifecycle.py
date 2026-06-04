@@ -14,7 +14,7 @@ TRACKING_EVENTS = {"init", "updated", "deleted"}
 TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
 
 def read_jsonl(filename):
-    # Read VML output as JSONL, where each line is one log entry.
+    # Read VMlog output as JSONL, where each line is one log entry.
     with open(filename, "r", encoding="utf-8") as file:
         return [json.loads(line) for line in file]
 
@@ -51,16 +51,16 @@ def run_script_and_read_logs(test_case, script, log_file):
 
     return read_jsonl(log_file)
 
-class TestVMLProcessLifecycle(unittest.TestCase):
+class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_atexit_saves_log_without_manual_final_save(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             log_file = os.path.join(temp_dir, "atexit_basic.jsonl")
 
             script = textwrap.dedent(f"""
-                import vml
+                import vmlog
 
                 target = [1, 2]
-                monitor = vml.logger("target", filename={log_file!r})
+                monitor = vmlog.logger("target", filename={log_file!r})
 
                 target.append(3)
 
@@ -80,11 +80,11 @@ class TestVMLProcessLifecycle(unittest.TestCase):
             log_file = os.path.join(temp_dir, "return_event.jsonl")
 
             script = textwrap.dedent(f"""
-                import vml
+                import vmlog
 
                 def run():
                     target = {{"count": 1}}
-                    monitor = vml.logger("target", filename={log_file!r})
+                    monitor = vmlog.logger("target", filename={log_file!r})
                     target["count"] = 2
                     return "done"
 
@@ -103,12 +103,12 @@ class TestVMLProcessLifecycle(unittest.TestCase):
             log_file = os.path.join(temp_dir, "multiple_variables_atexit.jsonl")
 
             script = textwrap.dedent(f"""
-                import vml
+                import vmlog
 
                 first = [10]
                 second = "before"
 
-                monitor = vml.VML({log_file!r})
+                monitor = vmlog.VMlog({log_file!r})
                 monitor.logger("first")
                 monitor.logger("second")
 
@@ -140,10 +140,10 @@ class TestVMLProcessLifecycle(unittest.TestCase):
             log_file = os.path.join(temp_dir, "schema_after_exit.jsonl")
 
             script = textwrap.dedent(f"""
-                import vml
+                import vmlog
 
                 target = {{"state": "start"}}
-                monitor = vml.logger("target", filename={log_file!r})
+                monitor = vmlog.logger("target", filename={log_file!r})
 
                 target["state"] = "end"
 

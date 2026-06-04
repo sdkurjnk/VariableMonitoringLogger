@@ -4,10 +4,10 @@ import sys
 import tempfile
 import unittest
 
-import vml
-from vml.FileWriter import FileWriter
-from vml.HistoryBuffer import HistoryBuffer
-from vml.ScopeResolver import ScopeResolver
+import vmlog
+from vmlog.FileWriter import FileWriter
+from vmlog.HistoryBuffer import HistoryBuffer
+from vmlog.ScopeResolver import ScopeResolver
 
 LOCAL = 0
 GLOBAL = 1
@@ -29,7 +29,7 @@ def finalize_and_read_logs(monitor, filename):
     monitor._finalSave()
     return read_jsonl(filename)
 
-class TestVMLComponents(unittest.TestCase):
+class TestVMlogComponents(unittest.TestCase):
     def test_history_buffer_returns_deepcopy(self):
         buffer = HistoryBuffer()
         original_data = {"numbers": [1, 2, 3]}
@@ -111,12 +111,12 @@ class TestVMLComponents(unittest.TestCase):
         self.assertEqual(domain, NOT_FOUND)
         self.assertIsNone(value)
 
-    def test_vml_records_deleted_event(self):
+    def test_vmlog_records_deleted_event(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "deleted_event.jsonl")
 
             target = [1, 2]
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target.append(3)
             del target
@@ -140,7 +140,7 @@ class TestVMLComponents(unittest.TestCase):
             filename = os.path.join(temp_dir, "idempotent_save.jsonl")
 
             target = ["start"]
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target.append("changed")
 
