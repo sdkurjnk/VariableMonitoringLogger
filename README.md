@@ -1,4 +1,4 @@
-# Variable Monitoring Logger (VML)
+# Variable Monitoring Logger (VMlog)
 
 > Python 프로그램 실행 중 변수의 값 변화를 자동으로 감지하고 기록하는 모니터링 라이브러리
 
