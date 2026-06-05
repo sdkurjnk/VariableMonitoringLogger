@@ -1,4 +1,4 @@
-# Variable Monitoring Logger (VMlog)
+# vmlog
 
 > Python 프로그램 실행 중 변수의 값 변화를 자동으로 감지하고 기록하는 모니터링 라이브러리
 
@@ -104,7 +104,7 @@ active_items.append("sword")
 
 ---
 
-## 로그 형식
+## 5. 로그 형식
 
 로그는 JSON Lines(`.jsonl`) 형식으로 저장됩니다.  
 하나의 JSON 객체는 하나의 변수 변경 이력을 의미합니다.
@@ -128,7 +128,7 @@ active_items.append("sword")
 
 ---
 
-## 5. 아키텍처
+## 6. Architecture
 
 Python tracer를 통해 실행 흐름을 관찰하고, 변수 변경 여부 판단은 C 엔진에 위임하여 성능을 유지합니다.
 
@@ -179,7 +179,7 @@ sequenceDiagram
 
 ---
 
-## 디렉토리 구조
+## 7. File Structure
 
 ```
 .
@@ -210,7 +210,7 @@ sequenceDiagram
 
 ---
 
-## 테스트
+## 8. Test
 
 ```bash
 python tests/test.py
@@ -251,6 +251,6 @@ OK
 
 ---
 
-## 라이선스
+## License
 
 [MIT](./LICENSE) © sdkurjnk
