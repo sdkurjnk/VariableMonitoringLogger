@@ -4,22 +4,37 @@ import sys
 import tempfile
 import unittest
 
-import vml
-from vml.FileWriter import FileWriter
-from vml.HistoryBuffer import HistoryBuffer
-from vml.ScopeResolver import ScopeResolver
+import vmlog
+from vmlog.FileWriter import FileWriter
+from vmlog.HistoryBuffer import HistoryBuffer
+from vmlog.ScopeResolver import ScopeResolver
 
-
+LOCAL = 0
+GLOBAL = 1
+NOT_FOUND = -1
 TEST_GLOBAL_VALUE = "global-value"
 
+def read_jsonl(filename):
+    # Read VML output as JSONL, where each line is one log entry.
+    with open(filename, "r", encoding="utf-8") as file:
+        return [json.loads(line) for line in file]
 
-class TestVMLComponents(unittest.TestCase):
+def read_text(filename):
+    # Read full file content when tests compare exact persisted output.
+    with open(filename, "r", encoding="utf-8") as file:
+        return file.read()
 
+def finalize_and_read_logs(monitor, filename):
+    # Force pending trace events to be written before assertions inspect logs.
+    monitor._finalSave()
+    return read_jsonl(filename)
+
+class TestVMlogComponents(unittest.TestCase):
     def test_history_buffer_returns_deepcopy(self):
         buffer = HistoryBuffer()
         original_data = {"numbers": [1, 2, 3]}
 
-        buffer.append("target", original_data, "init")
+        buffer.append("target", original_data, "init", LOCAL, 1)
 
         history = buffer.getHistory()
         history[0]["data"]["numbers"].append(4)
@@ -33,8 +48,19 @@ class TestVMLComponents(unittest.TestCase):
     def test_history_buffer_clear(self):
         buffer = HistoryBuffer()
 
-        buffer.append("A", 10, "init")
-        buffer.append("A", 20, "updated")
+        buffer.append("A", 10, "init", LOCAL, 1)
+        buffer.append("A", 20, "updated", LOCAL, 2)
+
+        history = buffer.getHistory()
+
+        self.assertEqual(
+            history,
+            [
+                {"name": "A", "data": 10, "event": "init", "domain": "LOCAL", "line": 1},
+                {"name": "A", "data": 20, "event": "updated", "domain": "LOCAL", "line": 2},
+            ],
+        )
+
         buffer.clearBuffer()
 
         self.assertEqual(buffer.getHistory(), [])
@@ -51,9 +77,7 @@ class TestVMLComponents(unittest.TestCase):
 
             writer = FileWriter()
             writer.write(filename, history)
-
-            with open(filename, "r", encoding="utf-8") as f:
-                lines = [json.loads(line) for line in f]
+            lines = read_jsonl(filename)
 
         self.assertEqual(lines, history)
 
@@ -61,19 +85,21 @@ class TestVMLComponents(unittest.TestCase):
         resolver = ScopeResolver()
         TEST_GLOBAL_VALUE = "local-value"
 
+        # Resolve against this exact frame so the local value shadows the global one.
         frame = sys._getframe()
         domain, value = resolver.resolve(frame, "TEST_GLOBAL_VALUE")
 
-        self.assertEqual(domain, 0)
+        self.assertEqual(domain, LOCAL)
         self.assertEqual(value, "local-value")
 
     def test_scope_resolver_finds_global_variable(self):
         resolver = ScopeResolver()
 
+        # No local variable with this name exists here, so the resolver should use globals.
         frame = sys._getframe()
         domain, value = resolver.resolve(frame, "TEST_GLOBAL_VALUE")
 
-        self.assertEqual(domain, 1)
+        self.assertEqual(domain, GLOBAL)
         self.assertEqual(value, "global-value")
 
     def test_scope_resolver_returns_not_found(self):
@@ -82,58 +108,50 @@ class TestVMLComponents(unittest.TestCase):
         frame = sys._getframe()
         domain, value = resolver.resolve(frame, "THIS_VARIABLE_DOES_NOT_EXIST")
 
-        self.assertEqual(domain, -1)
+        self.assertEqual(domain, NOT_FOUND)
         self.assertIsNone(value)
 
-    def test_vml_records_deleted_event(self):
+    def test_vmlog_records_deleted_event(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "deleted_event.jsonl")
 
             target = [1, 2]
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target.append(3)
             del target
 
-            # for checking after deletion
+            # Run one more traced line after deletion so VML can record the missing variable.
             marker = "after-delete"
             self.assertEqual(marker, "after-delete")
 
-            monitor._finalSave()
-
-            with open(filename, "r", encoding="utf-8") as f:
-                logs = [json.loads(line) for line in f]
+            logs = finalize_and_read_logs(monitor, filename)
 
         events = [entry["event"] for entry in logs]
+        deleted_logs = [entry for entry in logs if entry["event"] == "deleted"]
 
         self.assertIn("init", events)
         self.assertIn("updated", events)
         self.assertIn("deleted", events)
-
-        deleted_logs = [entry for entry in logs if entry["event"] == "deleted"]
-        self.assertEqual(deleted_logs[-1]["data"], None)
+        self.assertIsNone(deleted_logs[-1]["data"])
 
     def test_final_save_is_idempotent(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "idempotent_save.jsonl")
 
             target = ["start"]
-            monitor = vml.logger("target", filename=filename)
+            monitor = vmlog.logger("target", filename=filename)
 
             target.append("changed")
 
+            # Saving twice should not rewrite or duplicate already flushed history.
             monitor._finalSave()
-
-            with open(filename, "r", encoding="utf-8") as f:
-                first_save = f.read()
+            first_save = read_text(filename)
 
             monitor._finalSave()
-
-            with open(filename, "r", encoding="utf-8") as f:
-                second_save = f.read()
+            second_save = read_text(filename)
 
         self.assertEqual(first_save, second_save)
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

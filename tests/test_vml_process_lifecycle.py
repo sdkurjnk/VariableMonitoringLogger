@@ -7,48 +7,60 @@ import textwrap
 import unittest
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
-
+EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line"}
+TRACKING_EVENTS = {"init", "updated", "deleted"}
+TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
 
 def read_jsonl(filename):
-    with open(filename, "r", encoding="utf-8") as f:
-        return [json.loads(line) for line in f]
+    # Read VMlog output as JSONL, where each line is one log entry.
+    with open(filename, "r", encoding="utf-8") as file:
+        return [json.loads(line) for line in file]
 
+def build_pythonpath():
+    # Make the local src package importable inside subprocess-based tests.
+    existing_pythonpath = os.environ.get("PYTHONPATH", "")
+    return str(SRC_DIR) + os.pathsep + existing_pythonpath
 
 def run_python_script(script):
+    # Run the sample program in a separate process to exercise atexit behavior.
     with tempfile.TemporaryDirectory() as temp_dir:
         script_path = os.path.join(temp_dir, "sample_program.py")
 
-        with open(script_path, "w", encoding="utf-8") as f:
-            f.write(script)
+        with open(script_path, "w", encoding="utf-8") as file:
+            file.write(script)
 
         env = os.environ.copy()
-        env["PYTHONPATH"] = str(SRC_DIR) + os.pathsep + env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = build_pythonpath()
 
-        result = subprocess.run(
+        return subprocess.run(
             [sys.executable, script_path],
             cwd=str(PROJECT_ROOT),
             env=env,
             text=True,
-            capture_output=True
+            capture_output=True,
         )
 
-        return result
+def run_script_and_read_logs(test_case, script, log_file):
+    # Assert the subprocess completed successfully before reading its log output.
+    result = run_python_script(script)
 
+    test_case.assertEqual(result.returncode, 0, result.stderr)
+    test_case.assertTrue(os.path.exists(log_file))
 
-class TestVMLProcessLifecycle(unittest.TestCase):
+    return read_jsonl(log_file)
 
+class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_atexit_saves_log_without_manual_final_save(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             log_file = os.path.join(temp_dir, "atexit_basic.jsonl")
 
             script = textwrap.dedent(f"""
-                import vml
+                import vmlog
 
                 target = [1, 2]
-                monitor = vml.logger("target", filename={log_file!r})
+                monitor = vmlog.logger("target", filename={log_file!r})
 
                 target.append(3)
 
@@ -56,12 +68,7 @@ class TestVMLProcessLifecycle(unittest.TestCase):
                 print(checkpoint)
             """)
 
-            result = run_python_script(script)
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(os.path.exists(log_file))
-
-            logs = read_jsonl(log_file)
+            logs = run_script_and_read_logs(self, script, log_file)
 
         self.assertEqual(logs[0]["event"], "init")
         self.assertEqual(logs[0]["data"], [1, 2])
@@ -73,23 +80,18 @@ class TestVMLProcessLifecycle(unittest.TestCase):
             log_file = os.path.join(temp_dir, "return_event.jsonl")
 
             script = textwrap.dedent(f"""
-                import vml
+                import vmlog
 
                 def run():
                     target = {{"count": 1}}
-                    monitor = vml.logger("target", filename={log_file!r})
+                    monitor = vmlog.logger("target", filename={log_file!r})
                     target["count"] = 2
                     return "done"
 
                 print(run())
             """)
 
-            result = run_python_script(script)
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(os.path.exists(log_file))
-
-            logs = read_jsonl(log_file)
+            logs = run_script_and_read_logs(self, script, log_file)
 
         self.assertEqual(logs[0]["event"], "init")
         self.assertEqual(logs[0]["data"], {"count": 1})
@@ -101,12 +103,12 @@ class TestVMLProcessLifecycle(unittest.TestCase):
             log_file = os.path.join(temp_dir, "multiple_variables_atexit.jsonl")
 
             script = textwrap.dedent(f"""
-                import vml
+                import vmlog
 
                 first = [10]
                 second = "before"
 
-                monitor = vml.VML({log_file!r})
+                monitor = vmlog.VMlog({log_file!r})
                 monitor.logger("first")
                 monitor.logger("second")
 
@@ -117,12 +119,7 @@ class TestVMLProcessLifecycle(unittest.TestCase):
                 print(checkpoint)
             """)
 
-            result = run_python_script(script)
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(os.path.exists(log_file))
-
-            logs = read_jsonl(log_file)
+            logs = run_script_and_read_logs(self, script, log_file)
 
         first_logs = [entry for entry in logs if entry["name"] == "first"]
         second_logs = [entry for entry in logs if entry["name"] == "second"]
@@ -143,10 +140,10 @@ class TestVMLProcessLifecycle(unittest.TestCase):
             log_file = os.path.join(temp_dir, "schema_after_exit.jsonl")
 
             script = textwrap.dedent(f"""
-                import vml
+                import vmlog
 
                 target = {{"state": "start"}}
-                monitor = vml.logger("target", filename={log_file!r})
+                monitor = vmlog.logger("target", filename={log_file!r})
 
                 target["state"] = "end"
 
@@ -154,20 +151,19 @@ class TestVMLProcessLifecycle(unittest.TestCase):
                 print(checkpoint)
             """)
 
-            result = run_python_script(script)
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(os.path.exists(log_file))
-
-            logs = read_jsonl(log_file)
+            logs = run_script_and_read_logs(self, script, log_file)
 
         self.assertGreaterEqual(len(logs), 2)
 
         for entry in logs:
-            self.assertEqual(set(entry.keys()), {"name", "data", "event"})
+            self.assertEqual(set(entry.keys()), EXPECTED_LOG_KEYS)
             self.assertEqual(entry["name"], "target")
-            self.assertIn(entry["event"], {"init", "updated", "deleted"})
-
+            self.assertIn(entry["event"], TRACKING_EVENTS)
+            self.assertIn(entry["domain"], TRACKING_DOMAINS)
+            self.assertTrue(
+                entry["line"] is None or isinstance(entry["line"], int),
+                f"Expected 'line' to be an int or None, got {entry['line']!r}",
+            )
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
