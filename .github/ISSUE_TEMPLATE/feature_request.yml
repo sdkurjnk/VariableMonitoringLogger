@@ -1,0 +1,49 @@
+name: Feature Request
+description: Suggest an idea or a new feature for this project.
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a great idea for this project? Tell us all about it!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem Statement"
+      placeholder: "Is your feature request related to a problem? Please describe. (e.g., I'm always frustrated when...)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Proposed Solution"
+      placeholder: "A clear and concise description of what you want to happen and how it should work."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternative Solutions"
+      placeholder: "A clear and concise description of any alternative solutions or features you've considered."
+    validations:
+      required: false
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: "Screenshots / Mockups"
+      placeholder: "Drag and drop visual examples, mockups, or diagrams to explain the request."
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Additional Context"
+      placeholder: "Add any other context or thoughts about the feature request here."
+    validations:
+      required: false
