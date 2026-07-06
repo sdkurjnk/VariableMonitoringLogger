@@ -19,15 +19,13 @@ class _vmlog:
         # Register a final save so logs are written even without manual cleanup.
         atexit.register(self._finalSave)
 
-    def logger(self, varName, frame=None):
+    def register(self, varName, frame=None):
         # Use the caller's frame by default so the requested variable can be resolved.
         if frame is None:
             frame = sys._getframe(1)
 
         domain, value = self.resolver.resolve(frame, varName)
         self.dispatcher.register(varName, domain, value, frame)
-
-        return self
 
     def _finalSave(self):
         # Keep this method idempotent because it may be called manually and by atexit.
@@ -45,9 +43,3 @@ class _vmlog:
     def _write_history(self):
         # Persist the collected history as JSONL through the configured writer.
         self.fileWriter.write(self.fileName, self.buffer.getHistory())
-
-
-def logger(varName, filename="vmlog.jsonl"):
-    # Create a monitor and register the variable from the caller's frame.
-    monitor = _vmlog(filename)
-    return monitor.logger(varName, sys._getframe(1))
