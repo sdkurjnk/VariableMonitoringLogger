@@ -16,11 +16,11 @@ _instance = None
 _instance_lock = threading.Lock()
 
 def logRegister(varName):
-    global _intance
+    global _instance
 
-    if _intance is None:
+    if _instance is None:
         with _instance_lock:
-            if _intance is None:
+            if _instance is None:
                 _instance = _vmlog()
 
     _instance.register(varName, sys._getframe(1))
