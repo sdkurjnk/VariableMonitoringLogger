@@ -41,5 +41,8 @@ class _vmlog:
         self.dispatcher.stop()
 
     def _write_history(self):
+        history = self.buffer.gethistory()
+        if not history:
+            return
         # Persist the collected history as JSONL through the configured writer.
         self.fileWriter.write(self.fileName, self.buffer.getHistory())
