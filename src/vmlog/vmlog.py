@@ -8,7 +8,7 @@ from .TraceDispatcher import TraceDispatcher
 
 
 class VMlog:
-    def __init__(self, fileName="vmlog.json"):
+    def __init__(self, fileName="vmlog.jsonl"):
         self.fileName = fileName
         self.buffer = HistoryBuffer()
         self.dispatcher = TraceDispatcher(self.buffer)
@@ -47,7 +47,7 @@ class VMlog:
         self.fileWriter.write(self.fileName, self.buffer.getHistory())
 
 
-def logger(varName, filename="vmlog.json"):
+def logger(varName, filename="vmlog.jsonl"):
     # Create a monitor and register the variable from the caller's frame.
     monitor = VMlog(filename)
     return monitor.logger(varName, sys._getframe(1))
