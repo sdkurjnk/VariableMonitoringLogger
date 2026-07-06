@@ -7,7 +7,7 @@ from .ScopeResolver import ScopeResolver
 from .TraceDispatcher import TraceDispatcher
 
 
-class _vmlog:
+class _VMlog:
     def __init__(self, fileName="vmlog.jsonl"):
         self.fileName = fileName
         self.buffer = HistoryBuffer()
@@ -42,7 +42,9 @@ class _vmlog:
 
     def _write_history(self):
         history = self.buffer.getHistory()
+
+        # Skip the write entirely so runs without recorded events leave no file behind.
         if not history:
             return
-        # Persist the collected history as JSONL through the configured writer.
-        self.fileWriter.write(self.fileName, self.buffer.getHistory())
+
+        self.fileWriter.write(self.fileName, history)
