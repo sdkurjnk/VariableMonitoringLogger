@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest
 
-import vmlog
+from vmlog._core import _VMlog
 from vmlog.FileWriter import FileWriter
 from vmlog.HistoryBuffer import HistoryBuffer
 from vmlog.ScopeResolver import ScopeResolver
@@ -116,7 +116,8 @@ class TestVMlogComponents(unittest.TestCase):
             filename = os.path.join(temp_dir, "deleted_event.jsonl")
 
             target = [1, 2]
-            monitor = vmlog.logger("target", filename=filename)
+            monitor = _VMlog(filename)
+            monitor.register("target")
 
             target.append(3)
             del target
@@ -140,7 +141,8 @@ class TestVMlogComponents(unittest.TestCase):
             filename = os.path.join(temp_dir, "idempotent_save.jsonl")
 
             target = ["start"]
-            monitor = vmlog.logger("target", filename=filename)
+            monitor = _VMlog(filename)
+            monitor.register("target")
 
             target.append("changed")
 

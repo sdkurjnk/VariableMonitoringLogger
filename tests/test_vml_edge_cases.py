@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-import vmlog
+from vmlog._core import _VMlog
 
 GLOBAL_COLLISION_VALUE = "global-value"
 INIT_EVENT = "init"
@@ -33,7 +33,8 @@ class TestVMlogEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "no_duplicate.jsonl")
 
             target = [1, 2, 3]
-            monitor = vmlog.logger("target", filename=filename)
+            monitor = _VMlog(filename)
+            monitor.register("target")
 
             # Run several traced lines without changing the tracked value.
             checkpoint_one = "line one"
@@ -60,7 +61,8 @@ class TestVMlogEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "nested_mutable.jsonl")
 
             target = {"users": [{"name": "Alice", "score": 10}]}
-            monitor = vmlog.logger("target", filename=filename)
+            monitor = _VMlog(filename)
+            monitor.register("target")
 
             target["users"][0]["score"] = 20
 
@@ -81,7 +83,8 @@ class TestVMlogEdgeCases(unittest.TestCase):
 
             def run_local_scope():
                 target_name_collision = "local-value"
-                monitor = vmlog.logger("target_name_collision", filename=filename)
+                monitor = _VMlog(filename)
+                monitor.register("target_name_collision")
 
                 target_name_collision = "local-updated"
 
@@ -105,7 +108,8 @@ class TestVMlogEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "stop_tracking.jsonl")
 
             target = [1]
-            monitor = vmlog.logger("target", filename=filename)
+            monitor = _VMlog(filename)
+            monitor.register("target")
 
             target.append(2)
 
@@ -137,7 +141,8 @@ class TestVMlogEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "unicode.jsonl")
 
             target = {"message": "안녕하세요", "status": "준비"}
-            monitor = vmlog.logger("target", filename=filename)
+            monitor = _VMlog(filename)
+            monitor.register("target")
 
             target["status"] = "완료"
 
@@ -158,10 +163,10 @@ class TestVMlogEdgeCases(unittest.TestCase):
             number = 1.5
             values = (1, 2)
 
-            monitor = vmlog.VMlog(filename)
-            monitor.logger("flag")
-            monitor.logger("number")
-            monitor.logger("values")
+            monitor = _VMlog(filename)
+            monitor.register("flag")
+            monitor.register("number")
+            monitor.register("values")
 
             flag = False
             number = 2.5
