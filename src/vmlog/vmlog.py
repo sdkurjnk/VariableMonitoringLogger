@@ -7,7 +7,7 @@ from .ScopeResolver import ScopeResolver
 from .TraceDispatcher import TraceDispatcher
 
 
-class VMlog:
+class vmlog:
     def __init__(self, fileName="vmlog.jsonl"):
         self.fileName = fileName
         self.buffer = HistoryBuffer()
