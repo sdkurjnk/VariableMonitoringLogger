@@ -7,7 +7,7 @@ from .ScopeResolver import ScopeResolver
 from .TraceDispatcher import TraceDispatcher
 
 
-class vmlog:
+class _vmlog:
     def __init__(self, fileName="vmlog.jsonl"):
         self.fileName = fileName
         self.buffer = HistoryBuffer()
@@ -49,5 +49,5 @@ class vmlog:
 
 def logger(varName, filename="vmlog.jsonl"):
     # Create a monitor and register the variable from the caller's frame.
-    monitor = VMlog(filename)
+    monitor = _vmlog(filename)
     return monitor.logger(varName, sys._getframe(1))
