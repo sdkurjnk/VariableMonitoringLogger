@@ -51,15 +51,15 @@ class TestLogRegisterPublicAPI(unittest.TestCase):
     def test_two_variables_merge_into_single_default_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                import vmlog
+                from vmlog import logRegister
 
                 def run():
                     A = 1
-                    result = vmlog.logRegister("A")
+                    result = logRegister("A")
                     assert result is None
                     A = 2
                     B = 10
-                    vmlog.logRegister("B")
+                    logRegister("B")
                     A = 3
                     B = 20
 
@@ -76,16 +76,16 @@ class TestLogRegisterPublicAPI(unittest.TestCase):
         # tracing or overwrite the history collected for earlier variables.
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                import vmlog
+                from vmlog import logRegister
 
                 def first():
                     A = 1
-                    vmlog.logRegister("A")
+                    logRegister("A")
                     A = 2
 
                 def second():
                     B = 10
-                    vmlog.logRegister("B")
+                    logRegister("B")
                     B = 20
 
                 first()
@@ -106,9 +106,9 @@ class TestLogRegisterPublicAPI(unittest.TestCase):
     def test_register_without_events_leaves_no_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                import vmlog
+                from vmlog import logRegister
 
-                vmlog.logRegister("this_name_never_exists")
+                logRegister("this_name_never_exists")
             """)
 
             self.assertFalse(os.path.exists(os.path.join(temp_dir, DEFAULT_LOG_NAME)))
