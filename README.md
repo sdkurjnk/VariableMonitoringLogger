@@ -61,13 +61,13 @@ python setup.py build_ext --inplace
 vmlog.logger 함수에 추적하고자 하는 변수의 이름을 문자열로 전달합니다.
 
 ```python
-import vmlog
+import Ocilo
 
 # 1. 추적 대상 변수 생성
 target_list = [100, 200]
 
 # 2. 감시 장치 등록 (이 시점에 'init' 이벤트가 기록됩니다)
-vmlog.logger("target_list")
+Ocilo.logger("target_list")
 
 # 3. 변수 조작 (인플레이스 변경 및 재할당 모두 자동 감지)
 target_list.append(300)
@@ -82,10 +82,10 @@ del target_list
 vmlog.VMlog 클래스를 인스턴스화하여 여러 개의 로컬/글로벌 변수를 동시에 모니터링하고 저장 파일명을 직접 지정할 수 있습니다.
 
 ```python
-import vmlog
+import Ocilo
 
 # 커스텀 로그 파일명을 지정하여 모니터 인스턴스 생성
-monitor = vmlog.VMlog(fileName="analytics_dump.jsonl")
+monitor = Ocilo.VMlog(fileName="analytics_dump.jsonl")
 
 user_score = 10
 active_items = ["potion", "shield"]
