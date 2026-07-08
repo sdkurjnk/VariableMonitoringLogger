@@ -7,13 +7,13 @@ import textwrap
 import unittest
 from pathlib import Path
 
-import vmlog
+import ocilo
 
-DEFAULT_LOG_NAME = "vmlog.jsonl"
+DEFAULT_LOG_NAME = "ocilo.jsonl"
 
-# Resolve the directory that contains the vmlog package so subprocess scenarios
+# Resolve the directory that contains the ocilo package so subprocess scenarios
 # import the same package regardless of src layout or installed layout.
-PACKAGE_PARENT = Path(vmlog.__file__).resolve().parents[1]
+PACKAGE_PARENT = Path(ocilo.__file__).resolve().parents[1]
 
 def run_scenario(test_case, temp_dir, source):
     # Each scenario runs in its own interpreter because atexit-driven saving and
@@ -39,7 +39,7 @@ def run_scenario(test_case, temp_dir, source):
 
 def read_default_log(test_case, temp_dir):
     log_path = os.path.join(temp_dir, DEFAULT_LOG_NAME)
-    test_case.assertTrue(os.path.exists(log_path), "expected vmlog.jsonl to be written")
+    test_case.assertTrue(os.path.exists(log_path), "expected ocilo.jsonl to be written")
 
     with open(log_path, "r", encoding="utf-8") as file:
         return [json.loads(line) for line in file]
@@ -47,19 +47,19 @@ def read_default_log(test_case, temp_dir):
 def events_for(entries, name):
     return [(entry["event"], entry["data"]) for entry in entries if entry["name"] == name]
 
-class TestLogRegisterPublicAPI(unittest.TestCase):
+class TestRegisterPublicAPI(unittest.TestCase):
     def test_two_variables_merge_into_single_default_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                from vmlog import logRegister
+                from ocilo import register
 
                 def run():
                     A = 1
-                    result = logRegister("A")
+                    result = register("A")
                     assert result is None
                     A = 2
                     B = 10
-                    logRegister("B")
+                    register("B")
                     A = 3
                     B = 20
 
@@ -72,20 +72,20 @@ class TestLogRegisterPublicAPI(unittest.TestCase):
         self.assertEqual(events_for(entries, "B"), [("init", 10), ("updated", 20)])
 
     def test_second_registration_does_not_clobber_first(self):
-        # Regression for issue #29: a later logRegister() call must not hijack
+        # Regression for issue #29: a later register() call must not hijack
         # tracing or overwrite the history collected for earlier variables.
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                from vmlog import logRegister
+                from ocilo import register
 
                 def first():
                     A = 1
-                    logRegister("A")
+                    register("A")
                     A = 2
 
                 def second():
                     B = 10
-                    logRegister("B")
+                    register("B")
                     B = 20
 
                 first()
@@ -99,27 +99,27 @@ class TestLogRegisterPublicAPI(unittest.TestCase):
 
     def test_import_only_leaves_no_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            run_scenario(self, temp_dir, "import vmlog\n")
+            run_scenario(self, temp_dir, "import ocilo\n")
 
             self.assertFalse(os.path.exists(os.path.join(temp_dir, DEFAULT_LOG_NAME)))
 
     def test_register_without_events_leaves_no_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                from vmlog import logRegister
+                from ocilo import register
 
-                logRegister("this_name_never_exists")
+                register("this_name_never_exists")
             """)
 
             self.assertFalse(os.path.exists(os.path.join(temp_dir, DEFAULT_LOG_NAME)))
 
     def test_public_api_surface(self):
-        # Importing vmlog is side-effect free, so this check can run in-process.
-        self.assertEqual(vmlog.__all__, ["logRegister"])
-        self.assertTrue(callable(vmlog.logRegister))
-        self.assertFalse(hasattr(vmlog, "logger"))
-        self.assertFalse(hasattr(vmlog, "VMlog"))
-        self.assertFalse(hasattr(vmlog, "register"))
+        # Importing ocilo is side-effect free, so this check can run in-process.
+        self.assertEqual(ocilo.__all__, ["register"])
+        self.assertTrue(callable(ocilo.register))
+        self.assertFalse(hasattr(ocilo, "logger"))
+        self.assertFalse(hasattr(ocilo, "VMlog"))
+        self.assertFalse(hasattr(ocilo, "logRegister"))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

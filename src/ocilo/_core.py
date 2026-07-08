@@ -7,8 +7,8 @@ from .ScopeResolver import ScopeResolver
 from .TraceDispatcher import TraceDispatcher
 
 
-class _Oscilo:
-    def __init__(self, fileName="Ocilo.jsonl"):
+class _Osilo:
+    def __init__(self, fileName="ocilo.jsonl"):
         self.fileName = fileName
         self.buffer = HistoryBuffer()
         self.dispatcher = TraceDispatcher(self.buffer)

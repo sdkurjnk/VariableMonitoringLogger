@@ -1,8 +1,8 @@
 from setuptools import setup, Extension
 
 module = Extension(
-    name="Ocilo.vmlog_engine",
-    sources=["src/Ocilo/vmlog_engine.c"],
+    name="ocilo.vmlog_engine",
+    sources=["src/ocilo/vmlog_engine.c"],
 )
 
 setup(

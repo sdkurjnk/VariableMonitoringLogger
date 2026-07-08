@@ -9,7 +9,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
-DEFAULT_LOG_NAME = "Ocilo.jsonl"
+DEFAULT_LOG_NAME = "ocilo.jsonl"
 EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line"}
 TRACKING_EVENTS = {"init", "updated", "deleted"}
 TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
@@ -26,7 +26,7 @@ def build_pythonpath():
 
 def run_python_script(script, cwd):
     # Run the sample program in a separate process to exercise atexit behavior.
-    # cwd is the script's own temp directory so the default "Ocilo.jsonl" output
+    # cwd is the script's own temp directory so the default "ocilo.jsonl" output
     # lands there instead of polluting the project root.
     script_path = os.path.join(cwd, "sample_program.py")
 
@@ -58,10 +58,10 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_atexit_saves_log_without_manual_final_save(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
-                import Ocilo
+                import ocilo
 
                 target = [1, 2]
-                Ocilo.register("target")
+                ocilo.register("target")
 
                 target.append(3)
 
@@ -79,11 +79,11 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_return_event_captures_last_change_inside_function(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
-                import Ocilo
+                import ocilo
 
                 def run():
                     target = {"count": 1}
-                    Ocilo.register("target")
+                    ocilo.register("target")
                     target["count"] = 2
                     return "done"
 
@@ -100,13 +100,13 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_atexit_saves_multiple_variables_from_single_default_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
-                import Ocilo
+                import ocilo
 
                 first = [10]
                 second = "before"
 
-                Ocilo.register("first")
-                Ocilo.register("second")
+                ocilo.register("first")
+                ocilo.register("second")
 
                 first.append(20)
                 second = "after"
@@ -134,10 +134,10 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_process_log_uses_jsonl_schema_after_exit(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
-                import Ocilo
+                import ocilo
 
                 target = {"state": "start"}
-                Ocilo.register("target")
+                ocilo.register("target")
 
                 target["state"] = "end"
 
