@@ -6,7 +6,7 @@ from . import vmlog_engine  # Import eagerly so a missing C extension fails at i
 from ._core import _Oscilo
 
 try:
-    __version__ = version("oscilo")
+    __version__ = version("vmlog")
 except PackageNotFoundError:
     __version__ = "unknown"
 
