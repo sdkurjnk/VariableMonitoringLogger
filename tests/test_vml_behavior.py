@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-from ocilo._core import _Osilo
+from oscilo._core import _Oscilo
 
 EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line"}
 TRACKING_EVENTS = {"init", "updated", "deleted"}
@@ -25,7 +25,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "list_append.jsonl")
 
             target = [1, 2]
-            monitor = _Osilo(filename)
+            monitor = _Oscilo(filename)
             monitor.register("target")
 
             target.append(3)
@@ -46,7 +46,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "dict_mutation.jsonl")
 
             target = {"count": 1, "items": ["A"]}
-            monitor = _Osilo(filename)
+            monitor = _Oscilo(filename)
             monitor.register("target")
 
             target["count"] = 2
@@ -68,7 +68,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "immutable_reassignment.jsonl")
 
             target = "before"
-            monitor = _Osilo(filename)
+            monitor = _Oscilo(filename)
             monitor.register("target")
 
             target = "after"
@@ -89,7 +89,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "deleted_variable.jsonl")
 
             target = [10, 20]
-            monitor = _Osilo(filename)
+            monitor = _Oscilo(filename)
             monitor.register("target")
 
             del target
@@ -113,7 +113,7 @@ class TestVMLBehavior(unittest.TestCase):
             first = [1]
             second = "alpha"
 
-            monitor = _Osilo(filename)
+            monitor = _Oscilo(filename)
             monitor.register("first")
             monitor.register("second")
 
@@ -145,7 +145,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "schema.jsonl")
 
             target = {"status": "ready"}
-            monitor = _Osilo(filename)
+            monitor = _Oscilo(filename)
             monitor.register("target")
 
             target["status"] = "done"

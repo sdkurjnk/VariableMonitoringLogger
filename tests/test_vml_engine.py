@@ -2,7 +2,7 @@ import copy
 import sys
 import unittest
 
-from ocilo import vmlog_engine
+from oscilo import vmlog_engine
 
 LOCAL = 0
 

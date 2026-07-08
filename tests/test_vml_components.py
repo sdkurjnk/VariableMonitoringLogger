@@ -4,10 +4,10 @@ import sys
 import tempfile
 import unittest
 
-from ocilo._core import _Osilo
-from ocilo.FileWriter import FileWriter
-from ocilo.HistoryBuffer import HistoryBuffer
-from ocilo.ScopeResolver import ScopeResolver
+from oscilo._core import _Oscilo
+from oscilo.FileWriter import FileWriter
+from oscilo.HistoryBuffer import HistoryBuffer
+from oscilo.ScopeResolver import ScopeResolver
 
 LOCAL = 0
 GLOBAL = 1
@@ -116,7 +116,7 @@ class TestVMlogComponents(unittest.TestCase):
             filename = os.path.join(temp_dir, "deleted_event.jsonl")
 
             target = [1, 2]
-            monitor = _Osilo(filename)
+            monitor = _Oscilo(filename)
             monitor.register("target")
 
             target.append(3)
@@ -141,7 +141,7 @@ class TestVMlogComponents(unittest.TestCase):
             filename = os.path.join(temp_dir, "idempotent_save.jsonl")
 
             target = ["start"]
-            monitor = _Osilo(filename)
+            monitor = _Oscilo(filename)
             monitor.register("target")
 
             target.append("changed")

@@ -7,13 +7,13 @@ import textwrap
 import unittest
 from pathlib import Path
 
-import ocilo
+import oscilo
 
 DEFAULT_LOG_NAME = "ocilo.jsonl"
 
 # Resolve the directory that contains the ocilo package so subprocess scenarios
 # import the same package regardless of src layout or installed layout.
-PACKAGE_PARENT = Path(ocilo.__file__).resolve().parents[1]
+PACKAGE_PARENT = Path(oscilo.__file__).resolve().parents[1]
 
 def run_scenario(test_case, temp_dir, source):
     # Each scenario runs in its own interpreter because atexit-driven saving and
@@ -115,11 +115,11 @@ class TestRegisterPublicAPI(unittest.TestCase):
 
     def test_public_api_surface(self):
         # Importing ocilo is side-effect free, so this check can run in-process.
-        self.assertEqual(ocilo.__all__, ["register"])
-        self.assertTrue(callable(ocilo.register))
-        self.assertFalse(hasattr(ocilo, "logger"))
-        self.assertFalse(hasattr(ocilo, "VMlog"))
-        self.assertFalse(hasattr(ocilo, "logRegister"))
+        self.assertEqual(oscilo.__all__, ["register"])
+        self.assertTrue(callable(oscilo.register))
+        self.assertFalse(hasattr(oscilo, "logger"))
+        self.assertFalse(hasattr(oscilo, "VMlog"))
+        self.assertFalse(hasattr(oscilo, "logRegister"))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
