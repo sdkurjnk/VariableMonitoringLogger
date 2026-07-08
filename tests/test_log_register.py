@@ -51,7 +51,7 @@ class TestRegisterPublicAPI(unittest.TestCase):
     def test_two_variables_merge_into_single_default_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                from ocilo import register
+                from oscilo import register
 
                 def run():
                     A = 1
@@ -76,7 +76,7 @@ class TestRegisterPublicAPI(unittest.TestCase):
         # tracing or overwrite the history collected for earlier variables.
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                from ocilo import register
+                from oscilo import register
 
                 def first():
                     A = 1
@@ -99,14 +99,14 @@ class TestRegisterPublicAPI(unittest.TestCase):
 
     def test_import_only_leaves_no_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            run_scenario(self, temp_dir, "import ocilo\n")
+            run_scenario(self, temp_dir, "import oscilo\n")
 
             self.assertFalse(os.path.exists(os.path.join(temp_dir, DEFAULT_LOG_NAME)))
 
     def test_register_without_events_leaves_no_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, """
-                from ocilo import register
+                from oscilo import register
 
                 register("this_name_never_exists")
             """)

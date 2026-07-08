@@ -58,10 +58,10 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_atexit_saves_log_without_manual_final_save(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
-                import ocilo
+                import oscilo
 
                 target = [1, 2]
-                ocilo.register("target")
+                oscilo.register("target")
 
                 target.append(3)
 
@@ -79,11 +79,11 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_return_event_captures_last_change_inside_function(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
-                import ocilo
+                import oscilo
 
                 def run():
                     target = {"count": 1}
-                    ocilo.register("target")
+                    oscilo.register("target")
                     target["count"] = 2
                     return "done"
 
@@ -100,13 +100,13 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_atexit_saves_multiple_variables_from_single_default_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
-                import ocilo
+                import oscilo
 
                 first = [10]
                 second = "before"
 
-                ocilo.register("first")
-                ocilo.register("second")
+                oscilo.register("first")
+                oscilo.register("second")
 
                 first.append(20)
                 second = "after"
@@ -134,10 +134,10 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
     def test_process_log_uses_jsonl_schema_after_exit(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
-                import ocilo
+                import oscilo
 
                 target = {"state": "start"}
-                ocilo.register("target")
+                oscilo.register("target")
 
                 target["state"] = "end"
 
