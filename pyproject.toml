@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oscilo"
-version = "1.4.0"
+version = "2.0.0"
 authors = [{name = "sdkurjnk", email = "sdkurjnk@naver.com"}]
 license = "MIT"
 description = "Zero-invasive Python variable-change tracker powered by a C-extension trace engine with automatic scope resolution and JSONL history output"
