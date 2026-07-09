@@ -141,7 +141,7 @@ static struct PyModuleDef vmlmodule = {
     VmlMethods
 };
 
-PyMODINIT_FUNC PyInit_vmlog_engine(void)
+PyMODINIT_FUNC PyInit_oscilo_engine(void)
 {
     return PyModule_Create(&vmlmodule);
 }
