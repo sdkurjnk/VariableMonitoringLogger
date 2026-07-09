@@ -74,7 +74,7 @@ static int compare_mutable_value(PyObject *current_value, PyObject *previous_sna
     return PyObject_RichCompareBool(current_value, previous_snapshot, Py_NE);
 }
 
-static PyObject *vmlog_check_variable(PyObject *self, PyObject *args)
+static PyObject *oscilo_check_variable(PyObject *self, PyObject *args)
 {
     PyObject *frame;
     PyObject *reference_prev;
@@ -129,7 +129,7 @@ static PyObject *vmlog_check_variable(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef VmlMethods[] = {
-    {"check_variable", vmlog_check_variable, METH_VARARGS, "Check variable status"},
+    {"check_variable", oscilo_check_variable, METH_VARARGS, "Check variable status"},
     {NULL, NULL, 0, NULL}
 };
 
