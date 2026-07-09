@@ -5,6 +5,20 @@ on:
     branches: [ develop, master ]
 
 jobs:
+  check-pr-checklist:
+    name: Verify PR Checklist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all checklist items are completed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const unchecked = (body.match(/- \[ \]/g) || []).length;
+            if (unchecked > 0) {
+              core.setFailed(`${unchecked} checklist item(s) unchecked. Complete all items before merging.`);
+            }
+
   test:
     runs-on: ubuntu-latest
     strategy:
