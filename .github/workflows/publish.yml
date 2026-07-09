@@ -1,4 +1,4 @@
-name: Publish ocilo to PyPI
+name: Publish oscilo to PyPI
 on:
   release:
     types: [published]
@@ -60,7 +60,7 @@ jobs:
       id-token: write
     environment:
       name: release
-      url: https://pypi.org/p/vmlog
+      url: https://pypi.org/p/oscilo
 
     steps:
       - name: Download all artifacts
