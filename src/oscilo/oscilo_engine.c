@@ -74,7 +74,7 @@ static int compare_mutable_value(PyObject *current_value, PyObject *previous_sna
     return PyObject_RichCompareBool(current_value, previous_snapshot, Py_NE);
 }
 
-static PyObject *vmlog_check_variable(PyObject *self, PyObject *args)
+static PyObject *oscilo_check_variable(PyObject *self, PyObject *args)
 {
     PyObject *frame;
     PyObject *reference_prev;
@@ -128,20 +128,20 @@ static PyObject *vmlog_check_variable(PyObject *self, PyObject *args)
     Py_RETURN_FALSE;
 }
 
-static PyMethodDef VmlMethods[] = {
-    {"check_variable", vmlog_check_variable, METH_VARARGS, "Check variable status"},
+static PyMethodDef OsciloMethods[] = {
+    {"check_variable", oscilo_check_variable, METH_VARARGS, "Check variable status"},
     {NULL, NULL, 0, NULL}
 };
 
-static struct PyModuleDef vmlmodule = {
+static struct PyModuleDef oscilomodule = {
     PyModuleDef_HEAD_INIT,
-    "vmlog_engine",
+    "oscilo_engine",
     NULL,
     -1,
-    VmlMethods
+    OsciloMethods
 };
 
-PyMODINIT_FUNC PyInit_vmlog_engine(void)
+PyMODINIT_FUNC PyInit_oscilo_engine(void)
 {
-    return PyModule_Create(&vmlmodule);
+    return PyModule_Create(&oscilomodule);
 }
