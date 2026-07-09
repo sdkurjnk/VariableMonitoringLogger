@@ -1,4 +1,4 @@
-name: Publish vmlog to PyPI
+name: Publish ocilo to PyPI
 on:
   release:
     types: [published]
