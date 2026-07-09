@@ -111,7 +111,7 @@ class TestVMlogComponents(unittest.TestCase):
         self.assertEqual(domain, NOT_FOUND)
         self.assertIsNone(value)
 
-    def test_vmlog_records_deleted_event(self):
+    def test_oscilo_records_deleted_event(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "deleted_event.jsonl")
 
