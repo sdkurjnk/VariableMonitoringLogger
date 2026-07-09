@@ -1,9 +1,9 @@
 import copy
 
 try:
-    from . import vmlog_engine
+    from . import oscilo_engine
 except ImportError:
-    raise RuntimeError("vmlog_engine C extension is not found.")
+    raise RuntimeError("oscilo_engine C extension is not found.")
 
 LOCAL = 0
 GLOBAL = 1
@@ -108,7 +108,7 @@ class VariableTracker:
             self._isActive = True
             return INIT_EVENT
 
-        result = vmlog_engine.check_variable(
+        result = oscilo_engine.check_variable(
             frame,
             self._lastRef,
             self._lastCopy,
