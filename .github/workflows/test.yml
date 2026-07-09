@@ -7,6 +7,7 @@ on:
 jobs:
   check-pr-checklist:
     name: Verify PR Checklist
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - name: Check all checklist items are completed
