@@ -140,6 +140,55 @@ class TestVMLBehavior(unittest.TestCase):
         self.assertEqual(second_logs[-1]["event"], "updated")
         self.assertEqual(second_logs[-1]["data"], "beta")
 
+    def test_func_field_identifies_function_scope_for_same_variable_name(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, "func_scope.jsonl")
+            monitor = _Oscilo(filename)
+
+            def foo():
+                target = "foo-before"
+                monitor.register("target")
+
+                target = "foo-after"
+
+                # Keep tracing inside foo so the local update can be recorded.
+                checkpoint = "after foo update"
+                self.assertEqual(checkpoint, "after foo update")
+
+            def bar():
+                target = "bar-before"
+                monitor.register("target")
+
+                target = "bar-after"
+
+                # Keep tracing inside bar so the local update can be recorded.
+                checkpoint = "after bar update"
+                self.assertEqual(checkpoint, "after bar update")
+
+            foo()
+            bar()
+
+            logs = finalize_and_read_logs(monitor, filename)
+
+        foo_logs = [entry for entry in logs if entry["func"] == "foo"]
+        bar_logs = [entry for entry in logs if entry["func"] == "bar"]
+
+        self.assertGreaterEqual(len(foo_logs), 2)
+        self.assertGreaterEqual(len(bar_logs), 2)
+
+        self.assertEqual({entry["name"] for entry in foo_logs}, {"target"})
+        self.assertEqual({entry["name"] for entry in bar_logs}, {"target"})
+
+        self.assertEqual(foo_logs[0]["event"], "init")
+        self.assertEqual(foo_logs[0]["data"], "foo-before")
+        self.assertEqual(foo_logs[-1]["event"], "updated")
+        self.assertEqual(foo_logs[-1]["data"], "foo-after")
+
+        self.assertEqual(bar_logs[0]["event"], "init")
+        self.assertEqual(bar_logs[0]["data"], "bar-before")
+        self.assertEqual(bar_logs[-1]["event"], "updated")
+        self.assertEqual(bar_logs[-1]["data"], "bar-after")
+    
     def test_log_entries_use_jsonl_schema(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "schema.jsonl")
@@ -164,6 +213,7 @@ class TestVMLBehavior(unittest.TestCase):
             self.assertIn(entry["event"], TRACKING_EVENTS)
             self.assertIn(entry["domain"], TRACKING_DOMAINS)
             self.assertTrue(entry["line"] is None or isinstance(entry["line"], int))
+            self.assertTrue(entry["func"] is None or isinstance(entry["func"], str))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
