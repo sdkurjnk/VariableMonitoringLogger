@@ -10,7 +10,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
 DEFAULT_LOG_NAME = "ocilo.jsonl"
-EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line", "func"}
+EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line", "func", "call_id", "parent_call_id", "call_depth", }
 TRACKING_EVENTS = {"init", "updated", "deleted"}
 TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
 

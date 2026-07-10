@@ -15,6 +15,8 @@ class TraceDispatcher:
         self._is_tracing = False
         self._bufferRef = buffer
         self._resolver = ScopeResolver()
+        self._next_call_id = 1
+        self._frame_contexts = {}
 
     def setBuffer(self, buffer):
         self._bufferRef = buffer
@@ -29,6 +31,8 @@ class TraceDispatcher:
         )
         self._trackers.append(tracker)
 
+        context = self._ensure_call_context(frame)
+
         # Record the initial value when the variable already exists in scope.
         if domain in TRACKABLE_DOMAINS:
             self._append_buffer_event(
@@ -38,6 +42,9 @@ class TraceDispatcher:
                 domain,
                 self._get_frame_line(frame),
                 self._get_frame_func(frame),
+                self._get_context_call_id(context),
+                self._get_context_parent_call_id(context),
+                self._get_context_call_depth(context),
             )
 
         # Start global tracing once the first tracker is registered.
@@ -73,12 +80,14 @@ class TraceDispatcher:
 
         sys.settrace(None)
         self._is_tracing = False
+        self._frame_contexts.clear()
+        self._next_call_id = 1
 
-    def _append_buffer_event(self, varName, data, event_name, domain, line, func=None):
+    def _append_buffer_event(self, varName, data, event_name, domain, line, func=None, call_id=None, parent_call_id=None, call_depth=None):
         if self._bufferRef is None:
             return
 
-        self._bufferRef.append(varName, data, event_name, domain, line, func)
+        self._bufferRef.append(varName, data, event_name, domain, line, func, call_id, parent_call_id, call_depth, )
 
     def _get_frame_line(self, frame):
         if frame is None:
@@ -91,6 +100,52 @@ class TraceDispatcher:
             return None
 
         return frame.f_code.co_name
+
+    def _ensure_call_context(self, frame):
+        if frame is None:
+            return None
+
+        context = self._frame_contexts.get(frame)
+        if context is not None:
+            return context
+
+        parent_context = self._frame_contexts.get(frame.f_back)
+        parent_call_id = self._get_context_call_id(parent_context)
+        parent_depth = self._get_context_call_depth(parent_context)
+
+        context = {
+            "call_id": self._next_call_id,
+            "parent_call_id": parent_call_id,
+            "call_depth": parent_depth + 1 if parent_depth is not None else 1,
+        }
+        self._next_call_id += 1
+        self._frame_contexts[frame] = context
+
+        return context
+
+    def _clear_call_context(self, frame):
+        if frame is None:
+            return
+
+        self._frame_contexts.pop(frame, None)
+
+    def _get_context_call_id(self, context):
+        if context is None:
+            return None
+
+        return context["call_id"]
+
+    def _get_context_parent_call_id(self, context):
+        if context is None:
+            return None
+
+        return context["parent_call_id"]
+
+    def _get_context_call_depth(self, context):
+        if context is None:
+            return None
+
+        return context["call_depth"]
 
     def _get_event_data(self, tracker, event_name):
         # Deleted variables no longer have a value, so history stores None.
@@ -110,11 +165,13 @@ class TraceDispatcher:
         if event != "call":
             return
 
+        self._ensure_call_context(frame)
         return self._trace_lines
 
     def _trace_lines(self, frame, event, arg):
         if event not in ("line", "return"):
             return self._trace_lines
+        context = self._ensure_call_context(frame)
 
         # Iterate over a copy so tracker changes are safe during tracing.
         for tracker in list(self._trackers):
@@ -132,7 +189,13 @@ class TraceDispatcher:
                     self._get_logged_domain(tracker, event_name, domain),
                     frame.f_lineno,
                     self._get_frame_func(frame),
+                    self._get_context_call_id(context),
+                    self._get_context_parent_call_id(context),
+                    self._get_context_call_depth(context),
                 )
+
+        if event == "return":
+            self._clear_call_context(frame)
 
         return self._trace_lines
 

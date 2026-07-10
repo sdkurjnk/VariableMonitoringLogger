@@ -5,7 +5,7 @@ import unittest
 
 from oscilo._core import _Oscilo
 
-EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line", "func"}
+EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line", "func", "call_id", "parent_call_id", "call_depth", }
 TRACKING_EVENTS = {"init", "updated", "deleted"}
 TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
 
@@ -144,7 +144,6 @@ class TestVMLBehavior(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "func_scope.jsonl")
             monitor = _Oscilo(filename)
-
             def foo():
                 target = "foo-before"
                 monitor.register("target")
@@ -214,6 +213,43 @@ class TestVMLBehavior(unittest.TestCase):
             self.assertIn(entry["domain"], TRACKING_DOMAINS)
             self.assertTrue(entry["line"] is None or isinstance(entry["line"], int))
             self.assertTrue(entry["func"] is None or isinstance(entry["func"], str))
+            self.assertTrue(entry["call_id"] is None or isinstance(entry["call_id"], int))
+            self.assertTrue(entry["parent_call_id"] is None or isinstance(entry["parent_call_id"], int))
+            self.assertTrue(entry["call_depth"] is None or isinstance(entry["call_depth"], int))
+    def test_call_context_identifies_recursive_function_calls(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, "recursive_context.jsonl")
+            monitor = _Oscilo(filename)
+
+            def factorial(n):
+                monitor.register("n")
+
+                if n <= 1:
+                    return 1
+
+                return n * factorial(n - 1)
+
+            self.assertEqual(factorial(3), 6)
+
+            logs = finalize_and_read_logs(monitor, filename)
+
+        init_logs = [
+            entry
+            for entry in logs
+            if entry["name"] == "n" and entry["event"] == "init"
+        ]
+
+        self.assertEqual([entry["data"] for entry in init_logs], [3, 2, 1])
+        self.assertEqual([entry["func"] for entry in init_logs], ["factorial", "factorial", "factorial"])
+        self.assertEqual([entry["call_depth"] for entry in init_logs], [1, 2, 3])
+
+        call_ids = [entry["call_id"] for entry in init_logs]
+        parent_call_ids = [entry["parent_call_id"] for entry in init_logs]
+
+        self.assertEqual(len(set(call_ids)), 3)
+        self.assertIsNone(parent_call_ids[0])
+        self.assertEqual(parent_call_ids[1], call_ids[0])
+        self.assertEqual(parent_call_ids[2], call_ids[1])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
