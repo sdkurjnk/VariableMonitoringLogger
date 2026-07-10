@@ -216,6 +216,7 @@ class TestVMLBehavior(unittest.TestCase):
             self.assertTrue(entry["call_id"] is None or isinstance(entry["call_id"], int))
             self.assertTrue(entry["parent_call_id"] is None or isinstance(entry["parent_call_id"], int))
             self.assertTrue(entry["call_depth"] is None or isinstance(entry["call_depth"], int))
+
     def test_call_context_identifies_recursive_function_calls(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "recursive_context.jsonl")
@@ -250,6 +251,50 @@ class TestVMLBehavior(unittest.TestCase):
         self.assertIsNone(parent_call_ids[0])
         self.assertEqual(parent_call_ids[1], call_ids[0])
         self.assertEqual(parent_call_ids[2], call_ids[1])
+
+    def test_call_context_distinguishes_sibling_recursive_calls(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(temp_dir, "sibling_recursive_context.jsonl")
+            monitor = _Oscilo(filename)
+
+            def fib(n):
+                monitor.register("n")
+
+                if n <= 1:
+                    return n
+
+                return fib(n - 1) + fib(n - 2)
+
+            self.assertEqual(fib(3), 2)
+
+            logs = finalize_and_read_logs(monitor, filename)
+
+        init_logs = [
+            entry
+            for entry in logs
+            if entry["name"] == "n" and entry["event"] == "init"
+        ]
+
+        self.assertEqual([entry["data"] for entry in init_logs], [3, 2, 1, 0, 1])
+
+        call_ids = [entry["call_id"] for entry in init_logs]
+        parent_call_ids = [entry["parent_call_id"] for entry in init_logs]
+
+        self.assertEqual(len(call_ids), 5)
+        self.assertEqual(len(set(call_ids)), 5)
+
+        root_call_id = call_ids[0]
+        left_child_call_id = call_ids[1]
+        right_child_call_id = call_ids[4]
+
+        self.assertIsNone(parent_call_ids[0])
+        self.assertEqual(parent_call_ids[1], root_call_id)
+        self.assertEqual(parent_call_ids[2], left_child_call_id)
+        self.assertEqual(parent_call_ids[3], left_child_call_id)
+        self.assertEqual(parent_call_ids[4], root_call_id)
+
+        self.assertNotEqual(left_child_call_id, right_child_call_id)
+        self.assertEqual([entry["call_depth"] for entry in init_logs], [1, 2, 3, 3, 2])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
