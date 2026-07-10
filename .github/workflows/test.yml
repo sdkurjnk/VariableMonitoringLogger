@@ -15,7 +15,7 @@ jobs:
         with:
           script: |
             const body = context.payload.pull_request.body || '';
-            const unchecked = (body.match(/- \[ \]/g) || []).length;
+            const unchecked = (body.match(/^- \[ \]/gm) || []).length;
             if (unchecked > 0) {
               core.setFailed(`${unchecked} checklist item(s) unchecked. Complete all items before merging.`);
             }
