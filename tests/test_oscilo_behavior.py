@@ -5,7 +5,7 @@ import unittest
 
 from oscilo._core import _Oscilo
 
-EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line"}
+EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line", "func"}
 TRACKING_EVENTS = {"init", "updated", "deleted"}
 TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
 

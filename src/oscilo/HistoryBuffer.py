@@ -10,7 +10,7 @@ class HistoryBuffer:
     def __init__(self):
         self._history = []
 
-    def append(self, name, data, event, domain=None, line=None):
+    def append(self, name, data, event, domain=None, line=None, func=None):
         # Store a readable domain label so JSONL output is easy to inspect.
         history_entry = {
             "name": name,
@@ -18,6 +18,7 @@ class HistoryBuffer:
             "event": event,
             "domain": self._get_domain_label(domain),
             "line": line,
+            "func": func,
         }
         self._history.append(history_entry)
 

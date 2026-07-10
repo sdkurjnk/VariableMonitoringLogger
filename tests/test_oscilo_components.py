@@ -56,8 +56,8 @@ class TestVMlogComponents(unittest.TestCase):
         self.assertEqual(
             history,
             [
-                {"name": "A", "data": 10, "event": "init", "domain": "LOCAL", "line": 1},
-                {"name": "A", "data": 20, "event": "updated", "domain": "LOCAL", "line": 2},
+                {"name": "A", "data": 10, "event": "init", "domain": "LOCAL", "line": 1, "func": None},
+                {"name": "A", "data": 20, "event": "updated", "domain": "LOCAL", "line": 2, "func": None},
             ],
         )
 

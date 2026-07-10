@@ -37,6 +37,7 @@ class TraceDispatcher:
                 "init",
                 domain,
                 self._get_frame_line(frame),
+                self._get_frame_func(frame),
             )
 
         # Start global tracing once the first tracker is registered.
@@ -73,17 +74,23 @@ class TraceDispatcher:
         sys.settrace(None)
         self._is_tracing = False
 
-    def _append_buffer_event(self, varName, data, event_name, domain, line):
+    def _append_buffer_event(self, varName, data, event_name, domain, line, func=None):
         if self._bufferRef is None:
             return
 
-        self._bufferRef.append(varName, data, event_name, domain, line)
+        self._bufferRef.append(varName, data, event_name, domain, line, func)
 
     def _get_frame_line(self, frame):
         if frame is None:
             return None
 
         return frame.f_lineno
+
+    def _get_frame_func(self, frame):
+        if frame is None:
+            return None
+
+        return frame.f_code.co_name
 
     def _get_event_data(self, tracker, event_name):
         # Deleted variables no longer have a value, so history stores None.
@@ -124,6 +131,7 @@ class TraceDispatcher:
                     event_name,
                     self._get_logged_domain(tracker, event_name, domain),
                     frame.f_lineno,
+                    self._get_frame_func(frame),
                 )
 
         return self._trace_lines
