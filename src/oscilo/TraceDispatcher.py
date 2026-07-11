@@ -5,7 +5,9 @@ from .VariableTracker import VariableTracker
 
 LOCAL = 0
 GLOBAL = 1
-TRACKABLE_DOMAINS = (LOCAL, GLOBAL)
+ENCLOSING = 2
+BUILTIN = 3
+TRACKABLE_DOMAINS = (LOCAL, GLOBAL, ENCLOSING)
 BUFFERED_EVENTS = ("init", "updated", "deleted")
 DELETED_EVENT = "deleted"
 
@@ -200,7 +202,7 @@ class TraceDispatcher:
         return self._trace_lines
 
     def _should_skip_tracker(self, tracker, frame):
-        if tracker.domain == LOCAL and tracker.frame is not None:
+        if tracker.domain == LOCAL or tracker.domain == ENCLOSING and tracker.frame is not None:
             return frame is not tracker.frame
 
         if tracker.domain == GLOBAL and tracker.frame is not None:

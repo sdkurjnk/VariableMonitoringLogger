@@ -2,17 +2,21 @@
 
 typedef enum {
     LOCAL = 0,
-    GLOBAL = 1
+    GLOBAL = 1,
+    ENCLOSING = 2,
+    BUILTIN = 3
 } ScopeType;
 
 static PyObject *get_scope_dict(PyObject *frame, ScopeType domain)
 {
     // Select the dictionary that should be inspected for the requested scope.
-    if (domain == LOCAL) {
+    if (domain == LOCAL || domain == ENCLOSING) {
         return PyFrame_GetLocals((PyFrameObject *)frame);
     }
-
-    return PyFrame_GetGlobals((PyFrameObject *)frame);
+    if (domain == GLOBAL) {
+        return PyFrame_GetGlobals((PyFrameObject *)frame);
+    }
+    return NULL;
 }
 
 static PyObject *get_reference_from_scope(PyObject *scope_dict, PyObject *key)
