@@ -4,6 +4,7 @@ class HistoryBuffer:
     _DOMAIN_LABELS = {
         0: "LOCAL",
         1: "GLOBAL",
+        2: "ENCLOSING",
     }
     _UNKNOWN_DOMAIN_LABEL = "UNKNOWN"
 

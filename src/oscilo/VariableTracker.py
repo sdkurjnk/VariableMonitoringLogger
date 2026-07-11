@@ -7,6 +7,8 @@ except ImportError:
 
 LOCAL = 0
 GLOBAL = 1
+ENCLOSING = 2
+BUILTIN = 3
 NOT_FOUND = -1
 
 INIT_EVENT = "init"
@@ -77,10 +79,10 @@ class VariableTracker:
         self._isActive = False
 
     def _get_current_value(self, frame, domain, varName):
-        if domain == LOCAL:
+        if domain == LOCAL or domain == ENCLOSING:
             return frame.f_locals.get(varName)
-
-        return frame.f_globals.get(varName)
+        elif domain == GLOBAL:
+            return frame.f_globals.get(varName)
 
     def _handle_missing_variable(self):
         if self._isActive:
@@ -97,7 +99,7 @@ class VariableTracker:
         if varName is None:
             varName = self.varName
 
-        if domain == NOT_FOUND:
+        if domain == NOT_FOUND or domain == BUILTIN:
             return self._handle_missing_variable()
 
         self.domain = domain
