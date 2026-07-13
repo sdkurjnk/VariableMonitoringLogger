@@ -121,10 +121,10 @@ run()
 이력은 [JSON Lines](https://jsonlines.org/) 형식으로 기록됩니다(기본 파일명 `ocilo.jsonl`). 각 줄이 하나의 변화를 나타냅니다.
 
 ```json
-{"name": "target", "data": [100, 200], "event": "init", "domain": "LOCAL", "line": 4}
-{"name": "target", "data": [100, 200, 300], "event": "updated", "domain": "LOCAL", "line": 6}
-{"name": "target", "data": "reassigned", "event": "updated", "domain": "LOCAL", "line": 7}
-{"name": "target", "data": null, "event": "deleted", "domain": "LOCAL", "line": 8}
+{"name": "target", "data": [100, 200], "event": "init", "domain": "LOCAL", "line": 4, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "data": [100, 200, 300], "event": "updated", "domain": "LOCAL", "line": 6, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "data": "reassigned", "event": "updated", "domain": "LOCAL", "line": 7, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "data": null, "event": "deleted", "domain": "LOCAL", "line": 8, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
 ```
 
 | 필드 | 설명 |
@@ -132,8 +132,14 @@ run()
 | `name` | 추적 중인 변수 이름 |
 | `data` | 변화 시점의 값 (`deleted`일 때는 `null`) |
 | `event` | `init`, `updated`, `deleted` |
-| `domain` | 변수 스코프: `LOCAL`, `GLOBAL`, `UNKNOWN` |
+| `domain` | 변수 스코프: `LOCAL`, `GLOBAL`, `ENCLOSING`, `UNKNOWN` |
 | `line` | 변화가 감지된 소스 코드 줄 번호 |
+| `func` | 변화가 일어난 함수 이름 (모듈 최상위는 `<module>`) |
+| `call_id` | 변화가 일어난 함수 호출(프레임)의 고유 번호 |
+| `parent_call_id` | 호출한 프레임의 `call_id` (루트 호출은 `null`) |
+| `call_depth` | 등록 프레임을 1로 하는 상대적 호출 깊이 (루트 = `1`) |
+
+`call_id` / `parent_call_id` / `call_depth` 필드를 이용하면 호출 트리를 복원할 수 있습니다 — 각 변화가 어느 호출에서 일어났는지, 호출이 어떻게 중첩되는지 알 수 있습니다.
 
 줄 단위 형식이라 이력이 커도 스트리밍과 파싱이 효율적입니다.
 
@@ -164,7 +170,7 @@ src/oscilo/
 ├── _core.py             # 모니터 구현 및 atexit 저장 로직
 ├── FileWriter.py        # JSONL 출력
 ├── HistoryBuffer.py     # 메모리 내 이력 버퍼
-├── ScopeResolver.py     # 지역/전역 스코프 해석
+├── ScopeResolver.py     # LEGB 스코프 해석 (지역/둘러싼/전역/내장)
 ├── TraceDispatcher.py   # sys.settrace 이벤트 처리
 ├── VariableTracker.py   # 변수별 상태 및 스냅샷
 └── oscilo_engine.c      # 값 비교를 담당하는 C 확장 모듈
