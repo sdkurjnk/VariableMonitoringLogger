@@ -121,10 +121,10 @@ Notes:
 History is written as [JSON Lines](https://jsonlines.org/) (`ocilo.jsonl` by default). Each line represents a single change:
 
 ```json
-{"name": "target", "data": [100, 200], "event": "init", "domain": "LOCAL", "line": 4}
-{"name": "target", "data": [100, 200, 300], "event": "updated", "domain": "LOCAL", "line": 6}
-{"name": "target", "data": "reassigned", "event": "updated", "domain": "LOCAL", "line": 7}
-{"name": "target", "data": null, "event": "deleted", "domain": "LOCAL", "line": 8}
+{"name": "target", "data": [100, 200], "event": "init", "domain": "LOCAL", "line": 4, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "data": [100, 200, 300], "event": "updated", "domain": "LOCAL", "line": 6, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "data": "reassigned", "event": "updated", "domain": "LOCAL", "line": 7, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "data": null, "event": "deleted", "domain": "LOCAL", "line": 8, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
 ```
 
 | Field | Description |
@@ -132,8 +132,14 @@ History is written as [JSON Lines](https://jsonlines.org/) (`ocilo.jsonl` by def
 | `name` | The tracked variable name |
 | `data` | The value at the time of the change (`null` for `deleted`) |
 | `event` | `init`, `updated`, or `deleted` |
-| `domain` | Variable scope: `LOCAL`, `GLOBAL`, or `UNKNOWN` |
+| `domain` | Variable scope: `LOCAL`, `GLOBAL`, `ENCLOSING`, or `UNKNOWN` |
 | `line` | Source line where the change was detected |
+| `func` | Function in which the change occurred (`<module>` at module level) |
+| `call_id` | Unique id of the function call (frame) where the change occurred |
+| `parent_call_id` | `call_id` of the calling frame (`null` for a root call) |
+| `call_depth` | Call depth relative to the registration frame (root = `1`) |
+
+The `call_id` / `parent_call_id` / `call_depth` fields let a consumer reconstruct the call tree — i.e. which call each change happened in, and how the calls nest.
 
 The line-delimited format streams and parses efficiently for large histories.
 
@@ -164,7 +170,7 @@ src/oscilo/
 ├── _core.py             # monitor implementation and atexit save logic
 ├── FileWriter.py        # JSONL output
 ├── HistoryBuffer.py     # in-memory history buffer
-├── ScopeResolver.py     # local/global scope resolution
+├── ScopeResolver.py     # LEGB scope resolution (local/enclosing/global/builtin)
 ├── TraceDispatcher.py   # sys.settrace event handling
 ├── VariableTracker.py   # per-variable state and snapshots
 └── oscilo_engine.c      # C extension for value comparison
