@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oscilo"
-version = "2.0.0"
+dynamic = ["version"]
 authors = [{name = "sdkurjnk", email = "sdkurjnk@naver.com"}]
 license = "MIT"
 description = "Zero-invasive Python variable-change tracker powered by a C-extension trace engine with automatic scope resolution and JSONL history output"
@@ -28,3 +28,6 @@ zip-safe = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools_scm]
+version_file = "src/oscilo/_version.py"
