@@ -4,26 +4,60 @@ on:
     types: [published]
 
 jobs:
-  # 1. Building C Extension
+  # 1. Build the sdist first so it carries the setuptools-scm resolved version.
+  #    Wheels are then built from this sdist, so the C-extension build never needs
+  #    git access inside the cibuildwheel containers.
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # setuptools-scm needs full history + tags to resolve the version
+
+      - name: Build sdist
+        run: pipx run build --sdist
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibw-sdist
+          path: dist/*.tar.gz
+
+  # 2. Build the C-extension wheels from the sdist produced above. The sdist
+  #    already embeds the resolved version (PKG-INFO + _version.py), so no git
+  #    metadata is required inside the build containers.
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
+    needs: [build_sdist]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Set up QEMU
         if: matrix.os == 'ubuntu-latest'
         uses: docker/setup-qemu-action@v3
         with:
           platforms: all
 
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: cibw-sdist
+          path: dist
+
+      - name: Locate sdist
+        id: sdist
+        shell: bash
+        run: echo "path=$(ls dist/*.tar.gz)" >> "$GITHUB_OUTPUT"
+
       - name: Build wheels via cibuildwheel
         uses: pypa/cibuildwheel@v2.22.0
+        with:
+          package-dir: ${{ steps.sdist.outputs.path }}
         env:
           CIBW_BUILD: "cp311-* cp312-* cp313-*"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
@@ -34,23 +68,6 @@ jobs:
         with:
           name: cibw-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
-
-  # Building sdist
-  build_sdist:
-    name: Build source distribution
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build sdist
-        run: pipx run build --sdist
-
-      - name: Upload sdist artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cibw-sdist
-          path: dist/*.tar.gz
 
   upload_pypi:
     name: Upload to PyPI
