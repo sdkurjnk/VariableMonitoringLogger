@@ -9,3 +9,6 @@ build/
 oscilo.egg-info/
 
 __pycache__/
+
+# setuptools-scm generated version file
+src/oscilo/_version.py
