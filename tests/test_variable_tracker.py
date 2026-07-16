@@ -133,18 +133,6 @@ class TestVariableTrackerState(unittest.TestCase):
     def test_get_snapshot_returns_none_without_state(self):
         self.assertIsNone(self.tracker.get_snapshot(None))
 
-    def test_get_snapshot_keeps_legacy_no_argument_behavior(self):
-        tracker = VariableTracker(
-            "target",
-            value=[1, 2],
-            exists=True,
-        )
-
-        snapshot = tracker.get_snapshot()
-        snapshot.append(3)
-
-        self.assertEqual(tracker.get_snapshot(), [1, 2])
-
     def test_frame_state_check_initializes_local_value(self):
         target = [1, 2]
         frame = sys._getframe()
@@ -265,21 +253,14 @@ class TestVariableTrackerState(unittest.TestCase):
         self.assertEqual(event_name, NOT_FOUND_EVENT)
         self.assertIsNone(new_state)
 
-    def test_frame_state_check_does_not_mutate_instance_value_state(self):
-        target = [1]
-        frame = sys._getframe()
-
-        self.tracker.check(
-            frame,
-            LOCAL,
-            "target",
-            None,
+    def test_tracker_instance_keeps_only_identity_metadata(self):
+        self.assertEqual(
+            vars(self.tracker),
+            {
+                "varName": "target",
+                "domain": None,
+            },
         )
-
-        self.assertIsNone(self.tracker._lastRef)
-        self.assertIsNone(self.tracker._lastCopy)
-        self.assertIsNone(self.tracker._lastSnapshot)
-        self.assertFalse(self.tracker._isActive)
 
     def test_frame_state_check_tracks_global_with_external_state(self):
         global FRAME_STATE_GLOBAL_VALUE
@@ -311,8 +292,6 @@ class TestVariableTrackerState(unittest.TestCase):
 
             self.assertEqual(event_name, UPDATED_EVENT)
             self.assertEqual(new_state["copy"], ["before", "after"])
-            self.assertIsNone(self.tracker._lastRef)
-            self.assertIsNone(self.tracker._lastCopy)
         finally:
             FRAME_STATE_GLOBAL_VALUE = original_value
 
@@ -340,6 +319,90 @@ class TestVariableTrackerState(unittest.TestCase):
 
         self.assertEqual(event_name, UPDATED_EVENT)
         self.assertEqual(new_state["copy"], ["before", "after"])
+
+    def test_deleted_variable_can_initialize_again(self):
+        target = ["first"]
+        frame = sys._getframe()
+
+        event_name, state = self.tracker.check(
+            frame,
+            LOCAL,
+            "target",
+            None,
+        )
+
+        self.assertEqual(event_name, INIT_EVENT)
+        self.assertEqual(state["copy"], ["first"])
+
+        del target
+
+        event_name, state = self.tracker.check(
+            frame,
+            NOT_FOUND,
+            "target",
+            state,
+        )
+
+        self.assertEqual(event_name, DELETED_EVENT)
+        self.assertIsNone(state)
+
+        target = ["second"]
+
+        event_name, state = self.tracker.check(
+            frame,
+            LOCAL,
+            "target",
+            state,
+        )
+
+        self.assertEqual(event_name, INIT_EVENT)
+        self.assertEqual(state["copy"], ["second"])
+
+    def test_recursive_frames_keep_independent_states(self):
+        tracker = VariableTracker("n")
+        observations = []
+
+        def visit(n):
+            frame = sys._getframe()
+
+            event_name, state = tracker.check(
+                frame,
+                LOCAL,
+                "n",
+                None,
+            )
+
+            self.assertEqual(event_name, INIT_EVENT)
+            self.assertEqual(state["ref"], n)
+
+            if n > 1:
+                visit(n - 1)
+
+            event_name, restored_state = tracker.check(
+                frame,
+                LOCAL,
+                "n",
+                state,
+            )
+
+            observations.append(
+                (
+                    n,
+                    event_name,
+                    restored_state["ref"],
+                )
+            )
+
+        visit(3)
+
+        self.assertEqual(
+            observations,
+            [
+                (1, NO_CHANGE_EVENT, 1),
+                (2, NO_CHANGE_EVENT, 2),
+                (3, NO_CHANGE_EVENT, 3),
+            ],
+        )
 
 
 if __name__ == "__main__":
