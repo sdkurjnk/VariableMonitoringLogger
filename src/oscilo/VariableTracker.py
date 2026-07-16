@@ -133,18 +133,17 @@ class VariableTracker:
         # Do not expose the stored mutable snapshot directly to callers.
         return copy.deepcopy(state["copy"])
 
-    def check(self, frame, domain, varName=None):
-        if varName is None:
-            varName = self.varName
-
+    def _check_with_instance_state(self, frame, domain, varName):
+        # Temporary compatibility path for the current dispatcher. This path is
+        # removed after the dispatcher migrates to frame-local state.
         if domain == NOT_FOUND or domain == BUILTIN:
             return self._handle_missing_variable()
 
         self.domain = domain
-        currentVal = self._get_current_value(frame, domain, varName)
+        current_value = self._get_current_value(frame, domain, varName)
 
         if not self._isActive:
-            self._store(currentVal)
+            self._store(current_value)
             self._isActive = True
             return INIT_EVENT
 
@@ -162,5 +161,69 @@ class VariableTracker:
         if result is False:
             return NO_CHANGE_EVENT
 
-        self._store(currentVal)
+        self._store(current_value)
         return UPDATED_EVENT
+
+    def _check_with_frame_state(self, frame, domain, varName, prev_state):
+        if domain == NOT_FOUND or domain == BUILTIN:
+            if prev_state is None:
+                return NOT_FOUND_EVENT, None
+
+            return DELETED_EVENT, None
+
+        self.domain = domain
+        current_value = self._get_current_value(frame, domain, varName)
+
+        if prev_state is None:
+            return INIT_EVENT, self._make_state(current_value)
+
+        previous_ref = prev_state["ref"]
+        previous_copy = prev_state["copy"]
+
+        # Immutable values do not have a snapshot. Their reference identity is
+        # sufficient because they cannot mutate in place.
+        if previous_copy is None:
+            if current_value is previous_ref:
+                return NO_CHANGE_EVENT, prev_state
+
+            return UPDATED_EVENT, self._make_state(current_value)
+
+        result = oscilo_engine.check_variable(
+            frame,
+            previous_ref,
+            previous_copy,
+            domain,
+            varName,
+        )
+
+        if result is None:
+            return DELETED_EVENT, None
+
+        if result is False:
+            return NO_CHANGE_EVENT, prev_state
+
+        return UPDATED_EVENT, self._make_state(current_value)
+
+    def check(
+        self,
+        frame,
+        domain,
+        varName=None,
+        prev_state=_STATE_UNSET,
+    ):
+        if varName is None:
+            varName = self.varName
+
+        if prev_state is _STATE_UNSET:
+            return self._check_with_instance_state(
+                frame,
+                domain,
+                varName,
+            )
+
+        return self._check_with_frame_state(
+            frame,
+            domain,
+            varName,
+            prev_state,
+        )
