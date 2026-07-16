@@ -19,6 +19,20 @@ NO_CHANGE_EVENT = "no_change"
 
 _ATOMIC_TYPES = (int, float, bool, str, bytes, type(None))
 
+_FRAME_STATE_IMMUTABLE_TYPES = (
+    int,
+    float,
+    bool,
+    complex,
+    str,
+    bytes,
+    tuple,
+    frozenset,
+    type(None),
+)
+
+_STATE_UNSET = object()
+
 class VariableTracker:
     def __init__(self, varName, domain=None, value=None, exists=False, frame=None):
         self.varName = varName
@@ -65,6 +79,19 @@ class VariableTracker:
         except Exception:
             return repr(value)
 
+    def _make_state(self, value):
+        # Frame state always keeps the current live reference. Only values whose
+        # type may mutate in place need a detached snapshot for later comparison.
+        snapshot = None
+
+        if not isinstance(value, _FRAME_STATE_IMMUTABLE_TYPES):
+            snapshot = copy.deepcopy(value)
+
+        return {
+            "ref": value,
+            "copy": snapshot,
+        }
+
     def _store(self, value):
         # Store both a live reference and a snapshot for native change detection.
         snapshot = self._make_snapshot(value)
@@ -91,9 +118,20 @@ class VariableTracker:
 
         return NOT_FOUND_EVENT
 
-    def get_snapshot(self):
-        # Return a fresh snapshot so callers cannot mutate internal tracker state.
-        return self._make_snapshot(self._lastSnapshot)
+    def get_snapshot(self, state=_STATE_UNSET):
+        # Keep the existing no-argument path until the dispatcher is migrated to
+        # frame-local state in the following stages.
+        if state is _STATE_UNSET:
+            return self._make_snapshot(self._lastSnapshot)
+
+        if state is None:
+            return None
+
+        if state["copy"] is None:
+            return state["ref"]
+
+        # Do not expose the stored mutable snapshot directly to callers.
+        return copy.deepcopy(state["copy"])
 
     def check(self, frame, domain, varName=None):
         if varName is None:
