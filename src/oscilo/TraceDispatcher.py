@@ -58,9 +58,9 @@ class TraceDispatcher:
             or varName in code.co_freevars
         )
 
-    def register(self, varName, domain=None, value=None, frame=None):
+    def register(self, varName, frame=None):
         if frame is None:
-            tracker = VariableTracker(varName, domain=domain)
+            tracker = VariableTracker(varName)
             self._trackers.append(tracker)
             self._frame_cache.clear()
             self._start_tracing()
