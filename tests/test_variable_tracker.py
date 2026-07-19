@@ -40,13 +40,20 @@ class TestVariableTrackerState(unittest.TestCase):
         self.assertIsNone(state["ref"])
         self.assertIsNone(state["copy"])
 
-    def test_immutable_container_keeps_reference_without_copy(self):
-        value = (1, 2, 3)
+    def test_tuple_with_mutable_member_uses_deepcopy(self):
+        value = ([1, 2], 3)
 
         state = self.tracker._make_state(value)
 
         self.assertIs(state["ref"], value)
-        self.assertIsNone(state["copy"])
+        self.assertEqual(state["copy"], ([1, 2], 3))
+        self.assertIsNot(state["copy"], value)
+        self.assertIsNot(state["copy"][0], value[0])
+
+        value[0].append(4)
+
+        self.assertEqual(state["ref"], ([1, 2, 4], 3))
+        self.assertEqual(state["copy"], ([1, 2], 3))
 
     def test_mutable_list_state_uses_deepcopy(self):
         value = [1, 2]
@@ -99,8 +106,8 @@ class TestVariableTrackerState(unittest.TestCase):
         self.assertIsNot(state["copy"], value)
         self.assertEqual(state["copy"].value, ["before"])
 
-    def test_get_snapshot_returns_reference_for_immutable_state(self):
-        value = (1, 2)
+    def test_get_snapshot_returns_reference_for_atomic_state(self):
+        value = "ready"
         state = self.tracker._make_state(value)
 
         snapshot = self.tracker.get_snapshot(state)
@@ -192,6 +199,31 @@ class TestVariableTrackerState(unittest.TestCase):
         self.assertIs(new_state["ref"], target)
         self.assertEqual(new_state["copy"], [1, 2])
         self.assertEqual(state["copy"], [1])
+
+    def test_frame_state_check_detects_nested_tuple_mutation(self):
+        target = ([1, 2], 3)
+        frame = sys._getframe()
+
+        _, state = self.tracker.check(
+            frame,
+            LOCAL,
+            "target",
+            None,
+        )
+
+        target[0].append(4)
+
+        event_name, new_state = self.tracker.check(
+            frame,
+            LOCAL,
+            "target",
+            state,
+        )
+
+        self.assertEqual(event_name, UPDATED_EVENT)
+        self.assertIs(new_state["ref"], target)
+        self.assertEqual(new_state["copy"], ([1, 2, 4], 3))
+        self.assertEqual(state["copy"], ([1, 2], 3))
 
     def test_frame_state_check_detects_immutable_reassignment(self):
         target = "before"
