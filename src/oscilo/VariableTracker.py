@@ -5,6 +5,7 @@ try:
 except ImportError:
     raise RuntimeError("oscilo_engine C extension is not found.")
 
+
 LOCAL = 0
 GLOBAL = 1
 ENCLOSING = 2
@@ -17,112 +18,104 @@ DELETED_EVENT = "deleted"
 NOT_FOUND_EVENT = "not_found"
 NO_CHANGE_EVENT = "no_change"
 
-_ATOMIC_TYPES = (int, float, bool, str, bytes, type(None))
+_FRAME_STATE_ATOMIC_TYPES = (
+    int,
+    float,
+    bool,
+    complex,
+    str,
+    bytes,
+    type(None),
+)
+
 
 class VariableTracker:
-    def __init__(self, varName, domain=None, value=None, exists=False, frame=None):
+    def __init__(self, varName, domain=None):
         self.varName = varName
         self.domain = domain
-        self.frame = frame
-        self._lastRef = None
-        self._lastCopy = None
-        self._lastSnapshot = None
-        self._isActive = False
 
-        if exists:
-            self._store(value)
-            self._isActive = True
+    def _make_state(self, value):
+        # Frame state always keeps the current live reference. Only atomic values
+        # can be compared by identity alone. Containers need a detached snapshot
+        # because they may hold mutable objects even when the container is immutable.
+        snapshot = None
 
-    def _make_snapshot(self, value):
-        # Atomic values are safe to reuse because they cannot be mutated in place.
-        if isinstance(value, _ATOMIC_TYPES):
-            return value
+        if not isinstance(value, _FRAME_STATE_ATOMIC_TYPES):
+            snapshot = copy.deepcopy(value)
 
-        value_type = type(value)
-
-        # Handle common containers directly to avoid unnecessary deepcopy cost.
-        if value_type is list:
-            return [self._make_snapshot(item) for item in value]
-
-        if value_type is dict:
-            return {
-                self._make_snapshot(key): self._make_snapshot(item)
-                for key, item in value.items()
-            }
-
-        if value_type is set:
-            return {self._make_snapshot(item) for item in value}
-
-        if value_type is frozenset:
-            return frozenset(self._make_snapshot(item) for item in value)
-
-        if value_type is tuple:
-            return tuple(self._make_snapshot(item) for item in value)
-
-        # Fall back to deepcopy for custom objects, then repr if copying fails.
-        try:
-            return copy.deepcopy(value)
-        except Exception:
-            return repr(value)
-
-    def _store(self, value):
-        # Store both a live reference and a snapshot for native change detection.
-        snapshot = self._make_snapshot(value)
-        self._lastRef = value
-        self._lastCopy = snapshot
-        self._lastSnapshot = snapshot
-
-    def _clear_state(self):
-        self._lastRef = None
-        self._lastCopy = None
-        self._lastSnapshot = None
-        self._isActive = False
+        return {
+            "ref": value,
+            "copy": snapshot,
+        }
 
     def _get_current_value(self, frame, domain, varName):
         if domain == LOCAL or domain == ENCLOSING:
             return frame.f_locals.get(varName)
-        elif domain == GLOBAL:
+
+        if domain == GLOBAL:
             return frame.f_globals.get(varName)
 
-    def _handle_missing_variable(self):
-        if self._isActive:
-            self._clear_state()
-            return DELETED_EVENT
+        return None
 
-        return NOT_FOUND_EVENT
+    def get_snapshot(self, state):
+        if state is None:
+            return None
 
-    def get_snapshot(self):
-        # Return a fresh snapshot so callers cannot mutate internal tracker state.
-        return self._make_snapshot(self._lastSnapshot)
+        if state["copy"] is None:
+            return state["ref"]
 
-    def check(self, frame, domain, varName=None):
+        # Do not expose the stored mutable snapshot directly to callers.
+        return copy.deepcopy(state["copy"])
+
+    def check(
+        self,
+        frame,
+        domain,
+        varName=None,
+        prev_state=None,
+    ):
         if varName is None:
             varName = self.varName
 
         if domain == NOT_FOUND or domain == BUILTIN:
-            return self._handle_missing_variable()
+            if prev_state is None:
+                return NOT_FOUND_EVENT, None
+
+            return DELETED_EVENT, None
 
         self.domain = domain
-        currentVal = self._get_current_value(frame, domain, varName)
+        current_value = self._get_current_value(
+            frame,
+            domain,
+            varName,
+        )
 
-        if not self._isActive:
-            self._store(currentVal)
-            self._isActive = True
-            return INIT_EVENT
+        if prev_state is None:
+            return INIT_EVENT, self._make_state(current_value)
+
+        previous_ref = prev_state["ref"]
+        previous_copy = prev_state["copy"]
+
+        # Atomic values do not have a snapshot. Reference identity is enough
+        # because they cannot contain independently mutable state.
+        if previous_copy is None:
+            if current_value is previous_ref:
+                return NO_CHANGE_EVENT, prev_state
+
+            return UPDATED_EVENT, self._make_state(current_value)
 
         result = oscilo_engine.check_variable(
             frame,
-            self._lastRef,
-            self._lastCopy,
+            previous_ref,
+            previous_copy,
             domain,
             varName,
         )
 
         if result is None:
-            return self._handle_missing_variable()
+            return DELETED_EVENT, None
 
         if result is False:
-            return NO_CHANGE_EVENT
+            return NO_CHANGE_EVENT, prev_state
 
-        self._store(currentVal)
-        return UPDATED_EVENT
+        return UPDATED_EVENT, self._make_state(current_value)

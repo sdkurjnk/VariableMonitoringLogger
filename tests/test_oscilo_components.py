@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import Mock
 
 from oscilo._core import _Oscilo
 from oscilo.FileWriter import FileWriter
@@ -80,6 +81,18 @@ class TestVMlogComponents(unittest.TestCase):
             lines = read_jsonl(filename)
 
         self.assertEqual(lines, history)
+
+    def test_oscilo_register_delegates_resolution_to_dispatcher(self):
+        monitor = object.__new__(_Oscilo)
+        monitor.dispatcher = Mock()
+        frame = sys._getframe()
+
+        monitor.register("target", frame=frame)
+
+        monitor.dispatcher.register.assert_called_once_with(
+            "target",
+            frame=frame,
+        )
 
     def test_scope_resolver_finds_local_variable_first(self):
         resolver = ScopeResolver()
