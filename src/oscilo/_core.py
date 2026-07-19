@@ -3,7 +3,6 @@ import sys
 
 from .FileWriter import FileWriter
 from .HistoryBuffer import HistoryBuffer
-from .ScopeResolver import ScopeResolver
 from .TraceDispatcher import TraceDispatcher
 
 
@@ -12,7 +11,6 @@ class _Oscilo:
         self.fileName = fileName
         self.buffer = HistoryBuffer()
         self.dispatcher = TraceDispatcher(self.buffer)
-        self.resolver = ScopeResolver()
         self.fileWriter = FileWriter()
         self._saved = False
 
@@ -20,12 +18,11 @@ class _Oscilo:
         atexit.register(self._finalSave)
 
     def register(self, varName, frame=None):
-        # Use the caller's frame by default so the requested variable can be resolved.
+        # Pass the caller's frame so the dispatcher can resolve the variable.
         if frame is None:
             frame = sys._getframe(1)
 
-        domain, value = self.resolver.resolve(frame, varName)
-        self.dispatcher.register(varName, domain, value, frame)
+        self.dispatcher.register(varName, frame=frame)
 
     def _finalSave(self):
         # Keep this method idempotent because it may be called manually and by atexit.

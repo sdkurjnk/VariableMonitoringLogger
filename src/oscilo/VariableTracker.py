@@ -18,15 +18,13 @@ DELETED_EVENT = "deleted"
 NOT_FOUND_EVENT = "not_found"
 NO_CHANGE_EVENT = "no_change"
 
-_FRAME_STATE_IMMUTABLE_TYPES = (
+_FRAME_STATE_ATOMIC_TYPES = (
     int,
     float,
     bool,
     complex,
     str,
     bytes,
-    tuple,
-    frozenset,
     type(None),
 )
 
@@ -37,11 +35,12 @@ class VariableTracker:
         self.domain = domain
 
     def _make_state(self, value):
-        # Frame state always keeps the current live reference. Only values whose
-        # type may mutate in place need a detached snapshot for later comparison.
+        # Frame state always keeps the current live reference. Only atomic values
+        # can be compared by identity alone. Containers need a detached snapshot
+        # because they may hold mutable objects even when the container is immutable.
         snapshot = None
 
-        if not isinstance(value, _FRAME_STATE_IMMUTABLE_TYPES):
+        if not isinstance(value, _FRAME_STATE_ATOMIC_TYPES):
             snapshot = copy.deepcopy(value)
 
         return {
@@ -97,8 +96,8 @@ class VariableTracker:
         previous_ref = prev_state["ref"]
         previous_copy = prev_state["copy"]
 
-        # Immutable values do not have a snapshot. Reference identity is enough
-        # because they cannot mutate in place.
+        # Atomic values do not have a snapshot. Reference identity is enough
+        # because they cannot contain independently mutable state.
         if previous_copy is None:
             if current_value is previous_ref:
                 return NO_CHANGE_EVENT, prev_state
