@@ -58,13 +58,9 @@ class TraceDispatcher:
             or varName in code.co_freevars
         )
 
-    def register(self, varName, frame=None):
+    def register(self, varName, frame):
         if frame is None:
-            tracker = VariableTracker(varName)
-            self._trackers.append(tracker)
-            self._frame_cache.clear()
-            self._start_tracing()
-            return tracker
+            raise ValueError("frame is required to register a variable tracker")
 
         resolved_domain, _ = self._resolver.resolve(frame, varName)
         is_local = self._is_local_name(frame, varName)

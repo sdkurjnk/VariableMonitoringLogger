@@ -16,6 +16,17 @@ class TestTraceDispatcherFrameRelevance(unittest.TestCase):
         self.buffer = HistoryBuffer()
         self.dispatcher = TraceDispatcher(self.buffer)
 
+    def test_register_requires_frame(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "frame is required",
+        ):
+            self.dispatcher.register("target", frame=None)
+
+        self.assertEqual(self.dispatcher._trackers, [])
+        self.assertEqual(self.dispatcher._frame_cache, {})
+        self.assertFalse(self.dispatcher._is_tracing)
+
     def tearDown(self):
         self.dispatcher.stop()
 
