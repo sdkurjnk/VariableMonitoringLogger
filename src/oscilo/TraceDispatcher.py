@@ -42,6 +42,10 @@ class TraceDispatcher:
         # one frame's state.
         self._global_states = {}
 
+        # GLOBAL variables retain the ID of the frame where they were first
+        # registered, even when later changes occur in another call frame.
+        self._global_var_ids = {}
+
         # Per-active-frame local/enclosing state, keyed by the frame object
         # itself. Entries are removed on that frame's return event and the
         # dict is cleared on stop(), so nothing here outlives the frame.
@@ -83,6 +87,9 @@ class TraceDispatcher:
                 self._registered_global[dedup_key] = tracker
                 self._tracker_globals[tracker] = frame.f_globals
 
+                context = self._context_manager.ensure_context(frame)
+                self._global_var_ids[tracker] = self._get_context_call_id(context)
+
             # A new tracker can change which trackers apply to any code
             # object, so the relevance cache can no longer be trusted.
             self._frame_cache.clear()
@@ -115,6 +122,7 @@ class TraceDispatcher:
             self._registered_global.pop((tracker.varName, id(globals_dict)), None)
 
         self._global_states.pop(tracker, None)
+        self._global_var_ids.pop(tracker, None)
         self._frame_cache.clear()
 
         if not self._trackers:
@@ -144,13 +152,14 @@ class TraceDispatcher:
         self._registered_local.clear()
         self._registered_global.clear()
         self._global_states.clear()
+        self._global_var_ids.clear()
         self._context_manager.clear()
 
-    def _append_buffer_event(self, varName, data, event_name, domain, line, func=None, call_id=None, parent_call_id=None, call_depth=None):
+    def _append_buffer_event(self, varName, var_id, data, event_name, domain, line, func=None, call_id=None, parent_call_id=None, call_depth=None):
         if self._bufferRef is None:
             return
 
-        self._bufferRef.append(varName, data, event_name, domain, line, func, call_id, parent_call_id, call_depth, )
+        self._bufferRef.append(varName, var_id, data, event_name, domain, line, func, call_id, parent_call_id, call_depth, )
 
     def _get_frame_line(self, frame):
         if frame is None:
@@ -190,17 +199,23 @@ class TraceDispatcher:
         return resolved_domain
 
     def _log_event(self, frame, tracker, event_name, new_state, domain):
-        # Only touch call-context bookkeeping when there is something to log.
         context = self._context_manager.ensure_context(frame)
+        call_id = self._get_context_call_id(context)
+
+        if tracker in self._global_var_ids:
+            var_id = self._global_var_ids[tracker]
+        else:
+            var_id = call_id
 
         self._append_buffer_event(
             tracker.varName,
+            var_id,
             tracker.get_snapshot(new_state),
             event_name,
             self._get_logged_domain(tracker, event_name, domain),
             self._get_frame_line(frame),
             self._get_frame_func(frame),
-            self._get_context_call_id(context),
+            call_id,
             self._get_context_parent_call_id(context),
             self._get_context_call_depth(context),
         )

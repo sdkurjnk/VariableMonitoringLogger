@@ -5,7 +5,7 @@ import unittest
 
 from oscilo._core import _Oscilo
 
-EXPECTED_LOG_KEYS = {"name", "data", "event", "domain", "line", "func", "call_id", "parent_call_id", "call_depth", }
+EXPECTED_LOG_KEYS = {"name", "var_id", "data", "event", "domain", "line", "func", "call_id", "parent_call_id", "call_depth", }
 TRACKING_EVENTS = {"init", "updated", "deleted"}
 TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
 
@@ -213,6 +213,7 @@ class TestVMLBehavior(unittest.TestCase):
             self.assertIn(entry["domain"], TRACKING_DOMAINS)
             self.assertTrue(entry["line"] is None or isinstance(entry["line"], int))
             self.assertTrue(entry["func"] is None or isinstance(entry["func"], str))
+            self.assertIsInstance(entry["var_id"], int)
             self.assertTrue(entry["call_id"] is None or isinstance(entry["call_id"], int))
             self.assertTrue(entry["parent_call_id"] is None or isinstance(entry["parent_call_id"], int))
             self.assertTrue(entry["call_depth"] is None or isinstance(entry["call_depth"], int))
@@ -245,9 +246,13 @@ class TestVMLBehavior(unittest.TestCase):
         self.assertEqual([entry["call_depth"] for entry in init_logs], [1, 2, 3])
 
         call_ids = [entry["call_id"] for entry in init_logs]
+        var_ids = [entry["var_id"] for entry in init_logs]
         parent_call_ids = [entry["parent_call_id"] for entry in init_logs]
 
         self.assertEqual(len(set(call_ids)), 3)
+        self.assertEqual(len(set(var_ids)), 3)
+        self.assertEqual(var_ids, call_ids)
+
         self.assertIsNone(parent_call_ids[0])
         self.assertEqual(parent_call_ids[1], call_ids[0])
         self.assertEqual(parent_call_ids[2], call_ids[1])
