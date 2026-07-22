@@ -16,6 +16,8 @@ def var_ids_for(history, name):
 def call_ids_for(history, name):
     return [entry["call_id"] for entry in history if entry["name"] == name]
 
+def domains_for(history, name):
+    return [entry["domain"] for entry in history if entry["name"] == name]
 
 class TestTraceDispatcherEnclosingIdentity(unittest.TestCase):
     def setUp(self):
@@ -43,6 +45,7 @@ class TestTraceDispatcherEnclosingIdentity(unittest.TestCase):
         events = events_for(history, "total")
         var_ids = var_ids_for(history, "total")
         call_ids = call_ids_for(history, "total")
+        domains = domains_for(history, "total")
 
         self.assertEqual(events, [("init", 0), ("updated", 1), ("updated", 2), ("updated", 3)])
         self.assertEqual(len(set(var_ids)), 1)
@@ -53,6 +56,10 @@ class TestTraceDispatcherEnclosingIdentity(unittest.TestCase):
         # yield a single updated event with a call_id of their own.
         self.assertEqual(call_ids[0], call_ids[1])
         self.assertEqual(len({call_ids[1], call_ids[2], call_ids[3]}), 3)
+
+        # ENCLOSING is an internal LEGB classification only; the log always
+        # reports the variable as LOCAL, never as "ENCLOSING".
+        self.assertTrue(all(domain == "LOCAL" for domain in domains))
 
     def test_different_outer_calls_get_different_var_ids(self):
         def outer():

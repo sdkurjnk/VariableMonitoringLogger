@@ -364,12 +364,20 @@ class TraceDispatcher:
         return context["call_depth"]
 
     def _get_logged_domain(self, tracker, event_name, resolved_domain):
-        # 삭제로 인해 변수를 더 이상 해석할 수 없게 됐을 때는 이전 scope를 유지한다.
+        # Preserve the previous scope when deletion makes the variable unresolvable.
+        domain = resolved_domain
         if event_name == DELETED_EVENT and resolved_domain not in TRACKABLE_DOMAINS:
-            return tracker.domain
+            domain = tracker.domain
 
-        return resolved_domain
+        # ENCLOSING is only an internal LEGB classification used to route
+        # cell-based state/var_id resolution; the variable still lives in
+        # (and is owned by) a LOCAL frame from the log's point of view, so
+        # it is always reported as LOCAL, never ENCLOSING.
+        if domain == ENCLOSING:
+            return LOCAL
 
+        return domain
+    
     def _log_event(self, frame, tracker, event_name, new_state, domain, cell=None):
         context = self._context_manager.ensure_context(frame)
         call_id = self._get_context_call_id(context)
