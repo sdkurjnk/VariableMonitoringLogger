@@ -231,8 +231,37 @@ class TestTraceDispatcherGlobalDedup(unittest.TestCase):
         self.dispatcher.register("MODULE_LEVEL_COUNTER", frame=sys._getframe())
         recurse(3)
 
-        events = events_for(self.buffer.getHistory(), "MODULE_LEVEL_COUNTER")
-        self.assertEqual(events, [("init", {"value": 0}), ("updated", {"value": 1})])
+        history = self.buffer.getHistory()
+        events = events_for(history, "MODULE_LEVEL_COUNTER")
+
+        self.assertEqual(
+            events,
+            [
+                ("init", {"value": 0}),
+                ("updated", {"value": 1}),
+            ],
+        )
+
+        counter_logs = [
+            entry
+            for entry in history
+            if entry["name"] == "MODULE_LEVEL_COUNTER"
+        ]
+
+        init_log = next(
+            entry
+            for entry in counter_logs
+            if entry["event"] == "init"
+        )
+        updated_log = next(
+            entry
+            for entry in counter_logs
+            if entry["event"] == "updated"
+        )
+
+        self.assertEqual(init_log["var_id"], init_log["call_id"])
+        self.assertEqual(updated_log["var_id"], init_log["var_id"])
+        self.assertNotEqual(updated_log["call_id"], updated_log["var_id"])
 
     def test_register_stores_new_state_in_global_states(self):
         global MODULE_LEVEL_COUNTER

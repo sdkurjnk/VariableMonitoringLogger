@@ -35,7 +35,7 @@ class TestVMlogComponents(unittest.TestCase):
         buffer = HistoryBuffer()
         original_data = {"numbers": [1, 2, 3]}
 
-        buffer.append("target", original_data, "init", LOCAL, 1)
+        buffer.append("target", 1, original_data, "init", LOCAL, 1)
 
         history = buffer.getHistory()
         history[0]["data"]["numbers"].append(4)
@@ -45,20 +45,21 @@ class TestVMlogComponents(unittest.TestCase):
         self.assertEqual(stored_history[0]["name"], "target")
         self.assertEqual(stored_history[0]["event"], "init")
         self.assertEqual(stored_history[0]["data"], {"numbers": [1, 2, 3]})
+        self.assertEqual(stored_history[0]["var_id"], 1)
 
     def test_history_buffer_clear(self):
         buffer = HistoryBuffer()
 
-        buffer.append("A", 10, "init", LOCAL, 1)
-        buffer.append("A", 20, "updated", LOCAL, 2)
+        buffer.append("A", 1, 10, "init", LOCAL, 1)
+        buffer.append("A", 1, 20, "updated", LOCAL, 2)
 
         history = buffer.getHistory()
 
         self.assertEqual(
             history,
             [
-                {"name": "A", "data": 10, "event": "init", "domain": "LOCAL", "line": 1, "func": None, "call_id": None, "parent_call_id": None, "call_depth": None,},
-                {"name": "A", "data": 20, "event": "updated", "domain": "LOCAL", "line": 2, "func": None, "call_id": None, "parent_call_id": None, "call_depth": None,},
+                {"name": "A", "var_id": 1, "data": 10, "event": "init", "domain": "LOCAL", "line": 1, "func": None, "call_id": None, "parent_call_id": None, "call_depth": None,},
+                {"name": "A", "var_id": 1, "data": 20, "event": "updated", "domain": "LOCAL", "line": 2, "func": None, "call_id": None, "parent_call_id": None, "call_depth": None,},
             ],
         )
 

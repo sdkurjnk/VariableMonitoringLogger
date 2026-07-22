@@ -4,6 +4,13 @@ class CallContextManager:
         self._contexts = {}
         self._cleanup_traces = {}
 
+    def next_id(self):
+        # ID 공간을 공유해서, 합성된 identity(예: closure cell에 대한 ENCLOSING
+        # var_id)가 frame 기반 call_id 값과 절대 충돌하지 않도록 한다.
+        new_id = self._next_call_id
+        self._next_call_id += 1
+        return new_id
+
     def ensure_context(self, frame):
         if frame is None:
             return None
@@ -15,9 +22,9 @@ class CallContextManager:
         missing_frames = []
         current_frame = frame
 
-        # Walk toward an already known logging ancestor. Frames between that
-        # ancestor and the requested frame must also receive contexts so parent
-        # links and call depth remain continuous.
+        # 이미 알려진 logging ancestor를 향해 거슬러 올라간다. 그 ancestor와
+        # 요청된 frame 사이에 있는 frame들도 context를 가져야 parent 연결과
+        # call depth가 끊기지 않고 이어진다.
         while (
             current_frame is not None
             and current_frame not in self._contexts
@@ -26,9 +33,9 @@ class CallContextManager:
             current_frame = current_frame.f_back
 
         if current_frame is None:
-            # No logging ancestor exists. The requested frame becomes the root of
-            # a new logging chain rather than pulling unrelated interpreter and
-            # test-runner frames into the context tree.
+            # logging ancestor가 존재하지 않는다. context 트리에 무관한 인터프리터나
+            # 테스트 러너 frame을 끌어들이는 대신, 요청된 frame이 새로운 logging
+            # chain의 root가 된다.
             return self._create_context(
                 frame,
                 parent_context=None,
@@ -42,9 +49,9 @@ class CallContextManager:
                 parent_context,
             )
 
-            # The requested frame is relevant and its normal return tracer will
-            # call on_return(). Only automatically created gap frames need the
-            # lightweight return-only cleanup tracer.
+            # 요청된 frame은 관련(relevant) frame이므로 그 정상 return tracer가
+            # on_return()을 호출한다. 자동으로 생성된 gap frame만 가벼운
+            # return 전용 cleanup tracer가 필요하다.
             if missing_frame is not frame:
                 self._attach_return_cleanup(missing_frame)
 
@@ -89,8 +96,8 @@ class CallContextManager:
         if frame in self._cleanup_traces:
             return
 
-        # A frame with an existing local tracer is expected to be relevant. Its
-        # normal return path must call on_return(), so do not replace that tracer.
+        # 이미 local tracer가 있는 frame은 relevant한 frame으로 간주된다. 그
+        # 정상 return 경로가 on_return()을 호출해야 하므로 그 tracer를 대체하지 않는다.
         previous_trace = getattr(frame, "f_trace", None)
         if previous_trace is not None:
             return
