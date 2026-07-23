@@ -2,17 +2,21 @@
 
 typedef enum {
     LOCAL = 0,
-    GLOBAL = 1
+    GLOBAL = 1,
+    ENCLOSING = 2,
+    BUILTIN = 3
 } ScopeType;
 
 static PyObject *get_scope_dict(PyObject *frame, ScopeType domain)
 {
     // Select the dictionary that should be inspected for the requested scope.
-    if (domain == LOCAL) {
+    if (domain == LOCAL || domain == ENCLOSING) {
         return PyFrame_GetLocals((PyFrameObject *)frame);
     }
-
-    return PyFrame_GetGlobals((PyFrameObject *)frame);
+    if (domain == GLOBAL) {
+        return PyFrame_GetGlobals((PyFrameObject *)frame);
+    }
+    return NULL;
 }
 
 static PyObject *get_reference_from_scope(PyObject *scope_dict, PyObject *key)
@@ -74,7 +78,7 @@ static int compare_mutable_value(PyObject *current_value, PyObject *previous_sna
     return PyObject_RichCompareBool(current_value, previous_snapshot, Py_NE);
 }
 
-static PyObject *vmlog_check_variable(PyObject *self, PyObject *args)
+static PyObject *oscilo_check_variable(PyObject *self, PyObject *args)
 {
     PyObject *frame;
     PyObject *reference_prev;
@@ -128,20 +132,20 @@ static PyObject *vmlog_check_variable(PyObject *self, PyObject *args)
     Py_RETURN_FALSE;
 }
 
-static PyMethodDef VmlMethods[] = {
-    {"check_variable", vmlog_check_variable, METH_VARARGS, "Check variable status"},
+static PyMethodDef OsciloMethods[] = {
+    {"check_variable", oscilo_check_variable, METH_VARARGS, "Check variable status"},
     {NULL, NULL, 0, NULL}
 };
 
-static struct PyModuleDef vmlmodule = {
+static struct PyModuleDef oscilomodule = {
     PyModuleDef_HEAD_INIT,
-    "vmlog_engine",
+    "oscilo_engine",
     NULL,
     -1,
-    VmlMethods
+    OsciloMethods
 };
 
-PyMODINIT_FUNC PyInit_vmlog_engine(void)
+PyMODINIT_FUNC PyInit_oscilo_engine(void)
 {
-    return PyModule_Create(&vmlmodule);
+    return PyModule_Create(&oscilomodule);
 }

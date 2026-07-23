@@ -1,13 +1,13 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vmlog"
-version = "1.4.0"
+name = "oscilo"
+dynamic = ["version"]
 authors = [{name = "sdkurjnk", email = "sdkurjnk@naver.com"}]
-license = {text = "MIT"}
-description = "A Variable Monitoring Logger with C-Engine"
+license = "MIT"
+description = "Zero-invasive Python variable-change tracker powered by a C-extension trace engine with automatic scope resolution and JSONL history output"
 readme = "README.md"
 requires-python = ">=3.11"
 keywords = ["logging", "monitoring", "c-extension"]
@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sdkurjnk/VariableMonitoringLogger"
+Homepage = "https://github.com/sdkurjnk/oscilo/tree/master"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -28,3 +28,6 @@ zip-safe = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools_scm]
+version_file = "src/oscilo/_version.py"

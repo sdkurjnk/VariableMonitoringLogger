@@ -3,11 +3,12 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import Mock
 
-import vmlog
-from vmlog.FileWriter import FileWriter
-from vmlog.HistoryBuffer import HistoryBuffer
-from vmlog.ScopeResolver import ScopeResolver
+from oscilo._core import _Oscilo
+from oscilo.FileWriter import FileWriter
+from oscilo.HistoryBuffer import HistoryBuffer
+from oscilo.ScopeResolver import ScopeResolver
 
 LOCAL = 0
 GLOBAL = 1
@@ -34,7 +35,7 @@ class TestVMlogComponents(unittest.TestCase):
         buffer = HistoryBuffer()
         original_data = {"numbers": [1, 2, 3]}
 
-        buffer.append("target", original_data, "init", LOCAL, 1)
+        buffer.append("target", 1, original_data, "init", LOCAL, 1)
 
         history = buffer.getHistory()
         history[0]["data"]["numbers"].append(4)
@@ -44,20 +45,21 @@ class TestVMlogComponents(unittest.TestCase):
         self.assertEqual(stored_history[0]["name"], "target")
         self.assertEqual(stored_history[0]["event"], "init")
         self.assertEqual(stored_history[0]["data"], {"numbers": [1, 2, 3]})
+        self.assertEqual(stored_history[0]["var_id"], 1)
 
     def test_history_buffer_clear(self):
         buffer = HistoryBuffer()
 
-        buffer.append("A", 10, "init", LOCAL, 1)
-        buffer.append("A", 20, "updated", LOCAL, 2)
+        buffer.append("A", 1, 10, "init", LOCAL, 1)
+        buffer.append("A", 1, 20, "updated", LOCAL, 2)
 
         history = buffer.getHistory()
 
         self.assertEqual(
             history,
             [
-                {"name": "A", "data": 10, "event": "init", "domain": "LOCAL", "line": 1},
-                {"name": "A", "data": 20, "event": "updated", "domain": "LOCAL", "line": 2},
+                {"name": "A", "var_id": 1, "data": 10, "event": "init", "domain": "LOCAL", "line": 1, "func": None, "call_id": None, "parent_call_id": None, "call_depth": None,},
+                {"name": "A", "var_id": 1, "data": 20, "event": "updated", "domain": "LOCAL", "line": 2, "func": None, "call_id": None, "parent_call_id": None, "call_depth": None,},
             ],
         )
 
@@ -80,6 +82,18 @@ class TestVMlogComponents(unittest.TestCase):
             lines = read_jsonl(filename)
 
         self.assertEqual(lines, history)
+
+    def test_oscilo_register_delegates_resolution_to_dispatcher(self):
+        monitor = object.__new__(_Oscilo)
+        monitor.dispatcher = Mock()
+        frame = sys._getframe()
+
+        monitor.register("target", frame=frame)
+
+        monitor.dispatcher.register.assert_called_once_with(
+            "target",
+            frame=frame,
+        )
 
     def test_scope_resolver_finds_local_variable_first(self):
         resolver = ScopeResolver()
@@ -111,12 +125,13 @@ class TestVMlogComponents(unittest.TestCase):
         self.assertEqual(domain, NOT_FOUND)
         self.assertIsNone(value)
 
-    def test_vmlog_records_deleted_event(self):
+    def test_oscilo_records_deleted_event(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "deleted_event.jsonl")
 
             target = [1, 2]
-            monitor = vmlog.logger("target", filename=filename)
+            monitor = _Oscilo(filename)
+            monitor.register("target")
 
             target.append(3)
             del target
@@ -140,7 +155,8 @@ class TestVMlogComponents(unittest.TestCase):
             filename = os.path.join(temp_dir, "idempotent_save.jsonl")
 
             target = ["start"]
-            monitor = vmlog.logger("target", filename=filename)
+            monitor = _Oscilo(filename)
+            monitor.register("target")
 
             target.append("changed")
 

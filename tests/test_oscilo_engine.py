@@ -2,13 +2,13 @@ import copy
 import sys
 import unittest
 
-from vmlog import vmlog_engine
+from oscilo import oscilo_engine
 
 LOCAL = 0
 
 def check_local_variable(frame, previous_reference, previous_snapshot, variable_name):
     # Ask the native engine to compare a local variable in the provided frame.
-    return vmlog_engine.check_variable(
+    return oscilo_engine.check_variable(
         frame,
         previous_reference,
         previous_snapshot,
