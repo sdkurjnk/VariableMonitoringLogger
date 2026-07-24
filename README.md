@@ -6,7 +6,7 @@ Zero-invasive variable-change tracker for Python. Register a variable once and `
 [![Python](https://img.shields.io/pypi/pyversions/oscilo)](https://pypi.org/project/oscilo/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**English** | [한국어](./README.ko.md)
+**English** | [한국어](./docs/README.ko.md)
 
 `oscilo` observes program execution in the background and captures how a variable evolves over time — reassignments, in-place mutations, and deletions — then writes the full history to a JSON Lines file when the program exits. The value comparison that runs on every line is delegated to a small C extension to keep the runtime overhead low.
 
