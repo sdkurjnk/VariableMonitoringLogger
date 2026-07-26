@@ -4,9 +4,9 @@ Python 변수 변화를 코드 수정 없이 자동으로 추적하는 라이브
 
 [![PyPI version](https://img.shields.io/pypi/v/oscilo)](https://pypi.org/project/oscilo/)
 [![Python](https://img.shields.io/pypi/pyversions/oscilo)](https://pypi.org/project/oscilo/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 
-[English](./README.md) | **한국어**
+[English](../README.md) | **한국어**
 
 `oscilo`는 프로그램 실행을 백그라운드에서 관찰하여 변수가 시간에 따라 어떻게 변하는지(재할당, 인플레이스 변경, 삭제)를 포착하고, 프로그램이 종료되는 시점에 전체 이력을 JSON Lines 파일로 기록합니다. 매 줄마다 수행되는 값 비교는 작은 C 확장 모듈에 위임하여 런타임 오버헤드를 낮게 유지합니다.
 
@@ -196,4 +196,4 @@ python tests/test.py
 
 ## 라이선스
 
-[MIT](./LICENSE) © 2026 [sdkurjnk](https://github.com/sdkurjnk)
+[MIT](../LICENSE) © 2026 [sdkurjnk](https://github.com/sdkurjnk)
