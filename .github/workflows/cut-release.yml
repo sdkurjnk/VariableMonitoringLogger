@@ -90,7 +90,7 @@ jobs:
           echo "next version: $next"
           echo "version=$next" >> "$GITHUB_OUTPUT"
 
-      - name: Create release branch from develop tip
+      - name: Create release branch with an opening commit
         if: ${{ steps.guard.outputs.skip == 'false' }}
         uses: actions/github-script@v7
         with:
@@ -98,7 +98,29 @@ jobs:
             const version = '${{ steps.ver.outputs.version }}';
             const { owner, repo } = context.repo;
             const dev = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
-            const sha = dev.data.object.sha;
+            const parent = dev.data.object.sha;
+            const parentCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: parent });
+
+            // Put an empty commit (same tree as develop tip) on the release branch so it
+            // always has at least one commit beyond develop. Otherwise, if no
+            // stabilization fixes are added, the release→develop back-merge PR would have
+            // no diff and cannot be opened (GitHub 422), stalling finalize/post-merge.
+            // The tag later lands on this commit, making it the shared ancestor of
+            // master and develop.
+            const commit = await github.rest.git.createCommit({
+              owner, repo,
+              message: `chore(release): open ${version}\n\nStabilization branch cut from develop. Add fixes here, then run "Finish release".`,
+              tree: parentCommit.data.tree.sha,
+              parents: [parent],
+            });
             const branch = `release/${version}`;
-            await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha });
-            core.notice(`Created ${branch} at ${sha.slice(0, 7)}. Run "Finish release" when stabilized.`);
+            try {
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+              core.notice(`Created ${branch} at ${commit.data.sha.slice(0, 7)} (opening commit). Run "Finish release" when stabilized.`);
+            } catch (e) {
+              if (e.status === 422) {
+                core.warning(`Branch ${branch} already exists — skipping creation.`);
+              } else {
+                throw e;
+              }
+            }

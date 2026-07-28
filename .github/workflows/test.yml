@@ -27,6 +27,8 @@ jobs:
   version-label:
     name: Verify Version Label
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Require exactly one version label on feature PRs
         uses: actions/github-script@v7
@@ -56,6 +58,8 @@ jobs:
   serialize-guard:
     name: Serialize Guard
     runs-on: ubuntu-latest
+    permissions:
+      contents: read        # listMatchingRefs (git refs) needs contents:read
     steps:
       - name: Block feature merge while a release/hotfix is open
         uses: actions/github-script@v7
