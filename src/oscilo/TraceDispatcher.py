@@ -258,6 +258,7 @@ class TraceDispatcher:
         # line tracing을 여기서 명시적으로 붙여야 한다(또는 이전 등록/호출에서
         # 이미 붙어 있다면 그것을 재사용한다).
         frame_state = self._ensure_frame_tracking(frame)
+        self._ensure_active_ancestor_tracking(frame)
 
         if self._is_enclosing_case(resolved_domain, tracker):
             self._check_and_log_enclosing(frame, tracker, varName)
@@ -491,6 +492,19 @@ class TraceDispatcher:
         self._frame_states[frame] = frame_state
         frame.f_trace = self._make_line_tracer(frame_state)
         return frame_state
+
+    def _ensure_active_ancestor_tracking(self, frame):
+        current_frame = frame.f_back
+
+        while current_frame is not None:
+            local_relevant, global_relevant = self._relevant_for(
+                current_frame
+            )
+
+            if local_relevant or global_relevant:
+                self._ensure_frame_tracking(current_frame)
+
+            current_frame = current_frame.f_back
 
     def _trace_calls(self, frame, event, arg):
         if event != "call":
