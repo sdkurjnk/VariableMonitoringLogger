@@ -7,7 +7,7 @@ from .TraceDispatcher import TraceDispatcher
 
 
 class _Oscilo:
-    def __init__(self, fileName="ocilo.jsonl"):
+    def __init__(self, fileName="oscilo.jsonl"):
         self.fileName = fileName
         self.buffer = HistoryBuffer()
         self.dispatcher = TraceDispatcher(self.buffer)

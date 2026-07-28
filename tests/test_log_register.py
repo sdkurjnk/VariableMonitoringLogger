@@ -9,9 +9,9 @@ from pathlib import Path
 
 import oscilo
 
-DEFAULT_LOG_NAME = "ocilo.jsonl"
+DEFAULT_LOG_NAME = "oscilo.jsonl"
 
-# Resolve the directory that contains the ocilo package so subprocess scenarios
+# Resolve the directory that contains the oscilo package so subprocess scenarios
 # import the same package regardless of src layout or installed layout.
 PACKAGE_PARENT = Path(oscilo.__file__).resolve().parents[1]
 
@@ -39,7 +39,7 @@ def run_scenario(test_case, temp_dir, source):
 
 def read_default_log(test_case, temp_dir):
     log_path = os.path.join(temp_dir, DEFAULT_LOG_NAME)
-    test_case.assertTrue(os.path.exists(log_path), "expected ocilo.jsonl to be written")
+    test_case.assertTrue(os.path.exists(log_path), "expected oscilo.jsonl to be written")
 
     with open(log_path, "r", encoding="utf-8") as file:
         return [json.loads(line) for line in file]
@@ -198,7 +198,7 @@ class TestRegisterPublicAPI(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(temp_dir, DEFAULT_LOG_NAME)))
 
     def test_public_api_surface(self):
-        # Importing ocilo is side-effect free, so this check can run in-process.
+        # Importing oscilo is side-effect free, so this check can run in-process.
         self.assertEqual(oscilo.__all__, ["register"])
         self.assertTrue(callable(oscilo.register))
         self.assertFalse(hasattr(oscilo, "logger"))

@@ -9,7 +9,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
-DEFAULT_LOG_NAME = "ocilo.jsonl"
+DEFAULT_LOG_NAME = "oscilo.jsonl"
 EXPECTED_LOG_KEYS = {"name", "var_id", "data", "event", "domain", "line", "func", "call_id", "parent_call_id", "call_depth", }
 TRACKING_EVENTS = {"init", "updated", "deleted"}
 TRACKING_DOMAINS = {"LOCAL", "GLOBAL"}
@@ -26,7 +26,7 @@ def build_pythonpath():
 
 def run_python_script(script, cwd):
     # Run the sample program in a separate process to exercise atexit behavior.
-    # cwd is the script's own temp directory so the default "ocilo.jsonl" output
+    # cwd is the script's own temp directory so the default "oscilo.jsonl" output
     # lands there instead of polluting the project root.
     script_path = os.path.join(cwd, "sample_program.py")
 

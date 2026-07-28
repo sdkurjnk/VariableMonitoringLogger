@@ -6,7 +6,7 @@ Zero-invasive variable-change tracker for Python. Register a variable once and `
 [![Python](https://img.shields.io/pypi/pyversions/oscilo)](https://pypi.org/project/oscilo/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**English** | [한국어](./README.ko.md)
+**English** | [한국어](./docs/README.ko.md)
 
 `oscilo` observes program execution in the background and captures how a variable evolves over time — reassignments, in-place mutations, and deletions — then writes the full history to a JSON Lines file when the program exits. The value comparison that runs on every line is delegated to a small C extension to keep the runtime overhead low.
 
@@ -89,7 +89,7 @@ def run():
     del target                  # deleted
 
 run()
-# On exit, the history is written to ocilo.jsonl
+# On exit, the history is written to oscilo.jsonl
 ```
 
 Calling `oscilo.register()` multiple times adds each variable to the same monitor, and all histories are merged into a single output file:
@@ -118,21 +118,22 @@ Notes:
 
 ## Output format
 
-History is written as [JSON Lines](https://jsonlines.org/) (`ocilo.jsonl` by default). Each line represents a single change:
+History is written as [JSON Lines](https://jsonlines.org/) (`oscilo.jsonl` by default). Each line represents a single change:
 
 ```json
-{"name": "target", "data": [100, 200], "event": "init", "domain": "LOCAL", "line": 4, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
-{"name": "target", "data": [100, 200, 300], "event": "updated", "domain": "LOCAL", "line": 6, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
-{"name": "target", "data": "reassigned", "event": "updated", "domain": "LOCAL", "line": 7, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
-{"name": "target", "data": null, "event": "deleted", "domain": "LOCAL", "line": 8, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "var_id": 1, "data": [100, 200], "event": "init", "domain": "LOCAL", "line": 4, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "var_id": 1, "data": [100, 200, 300], "event": "updated", "domain": "LOCAL", "line": 6, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "var_id": 1, "data": "reassigned", "event": "updated", "domain": "LOCAL", "line": 7, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
+{"name": "target", "var_id": 1, "data": null, "event": "deleted", "domain": "LOCAL", "line": 8, "func": "run", "call_id": 1, "parent_call_id": null, "call_depth": 1}
 ```
 
 | Field | Description |
 |-------|-------------|
 | `name` | The tracked variable name |
+| `var_id` | Identity of the tracked binding; records sharing a `var_id` refer to the same variable (matches `call_id` for locals; stays stable across frames for globals and closure variables) |
 | `data` | The value at the time of the change (`null` for `deleted`) |
 | `event` | `init`, `updated`, or `deleted` |
-| `domain` | Variable scope: `LOCAL`, `GLOBAL`, `ENCLOSING`, or `UNKNOWN` |
+| `domain` | Variable scope: `LOCAL` or `GLOBAL` (a closure/enclosing variable is reported as `LOCAL` from its owning frame's point of view and is identified by `var_id`) |
 | `line` | Source line where the change was detected |
 | `func` | Function in which the change occurred (`<module>` at module level) |
 | `call_id` | Unique id of the function call (frame) where the change occurred |
@@ -168,11 +169,12 @@ Unchanged values produce no record, and immutable values are skipped entirely wh
 src/oscilo/
 ├── __init__.py          # public API (register) and single-instance management
 ├── _core.py             # monitor implementation and atexit save logic
+├── CallContext.py       # lazy call-context tracking (call_id / parent_call_id / call_depth)
 ├── FileWriter.py        # JSONL output
 ├── HistoryBuffer.py     # in-memory history buffer
 ├── ScopeResolver.py     # LEGB scope resolution (local/enclosing/global/builtin)
 ├── TraceDispatcher.py   # sys.settrace event handling
-├── VariableTracker.py   # per-variable state and snapshots
+├── VariableTracker.py   # per-variable change detection and value snapshots
 └── oscilo_engine.c      # C extension for value comparison
 ```
 
@@ -182,7 +184,7 @@ src/oscilo/
 python tests/test.py
 ```
 
-Tests are discovered from `tests/` (`test_*.py`). Each scenario runs in a separate interpreter process, since `atexit`-driven saving and `sys.settrace` behavior can only be verified across a full process lifetime.
+Tests are discovered from `tests/` (`test_*.py`). Component tests run in-process, while the end-to-end scenarios (registration and process lifecycle) spawn a separate interpreter process, since `atexit`-driven saving and `sys.settrace` behavior can only be verified across a full process lifetime.
 
 ## Contributing
 
