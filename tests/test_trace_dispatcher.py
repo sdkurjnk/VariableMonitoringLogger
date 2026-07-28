@@ -366,6 +366,9 @@ class TestTraceDispatcherStopCleanup(unittest.TestCase):
         self.buffer = HistoryBuffer()
         self.dispatcher = TraceDispatcher(self.buffer)
 
+    def tearDown(self):
+        self.dispatcher.stop()
+
     def test_stop_clears_call_context_and_frame_state(self):
         def recurse(n):
             acc = n
@@ -380,6 +383,79 @@ class TestTraceDispatcherStopCleanup(unittest.TestCase):
         self.assertEqual(self.dispatcher._context_manager._cleanup_traces, {})
         self.assertEqual(self.dispatcher._frame_states, {})
         self.assertEqual(self.dispatcher._trackers, [])
+
+    def test_active_ancestor_states_are_isolated_and_removed_on_return(self):
+        global MODULE_LEVEL_COUNTER
+        MODULE_LEVEL_COUNTER = {"value": 0}
+        returned_frames = []
+
+        def outer():
+            def register_global():
+                self.dispatcher.register(
+                    "MODULE_LEVEL_COUNTER",
+                    frame=sys._getframe(),
+                )
+
+            register_global()
+
+            outer_frame = sys._getframe()
+            parent_frame = outer_frame.f_back
+
+            self.assertIn(
+                outer_frame,
+                self.dispatcher._frame_states,
+            )
+            self.assertIn(
+                parent_frame,
+                self.dispatcher._frame_states,
+            )
+            self.assertIsNot(
+                self.dispatcher._frame_states[outer_frame],
+                self.dispatcher._frame_states[parent_frame],
+            )
+
+            returned_frames.append(outer_frame)
+
+        outer()
+
+        self.assertNotIn(
+            returned_frames[0],
+            self.dispatcher._frame_states,
+        )
+        self.assertIn(
+            sys._getframe(),
+            self.dispatcher._frame_states,
+        )
+
+    def test_stop_clears_active_ancestor_frame_state(self):
+        global MODULE_LEVEL_COUNTER
+        MODULE_LEVEL_COUNTER = {"value": 0}
+
+        def register_global():
+            self.dispatcher.register(
+                "MODULE_LEVEL_COUNTER",
+                frame=sys._getframe(),
+            )
+
+        register_global()
+
+        active_ancestor = sys._getframe()
+
+        self.assertIn(
+            active_ancestor,
+            self.dispatcher._frame_states,
+        )
+
+        self.dispatcher.stop()
+
+        self.assertNotIn(
+            active_ancestor,
+            self.dispatcher._frame_states,
+        )
+        self.assertEqual(
+            self.dispatcher._frame_states,
+            {},
+        )
 
 
 if __name__ == "__main__":
