@@ -97,6 +97,50 @@ class TestRegisterPublicAPI(unittest.TestCase):
         self.assertEqual(events_for(entries, "A"), [("init", 1), ("updated", 2)])
         self.assertEqual(events_for(entries, "B"), [("init", 10), ("updated", 20)])
 
+    def test_global_update_in_active_module_frame_is_tracked(self):
+        # Regression for issue #39: sys.settrace() does not retroactively
+        # attach line tracing to module frames that were already active when
+        # register() was called from a child frame.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_scenario(self, temp_dir, """
+                import oscilo
+
+                A = 10
+
+                def register_a():
+                    oscilo.register("A")
+
+                def update_a():
+                    global A
+                    A = 11
+
+                register_a()
+                update_a()
+                A = 12
+
+                checkpoint = "after module update"
+                print(checkpoint)
+            """)
+
+            entries = read_default_log(self, temp_dir)
+
+        a_entries = [
+            entry
+            for entry in entries
+            if entry["name"] == "A"
+        ]
+
+        self.assertEqual(
+            events_for(entries, "A"),
+            [
+                ("init", 10),
+                ("updated", 11),
+                ("updated", 12),
+            ],
+        )
+        self.assertEqual(a_entries[-1]["domain"], "GLOBAL")
+        self.assertEqual(a_entries[-1]["func"], "<module>")
+
     def test_import_only_leaves_no_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, "import oscilo\n")
