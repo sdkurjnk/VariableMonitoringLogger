@@ -2,7 +2,7 @@ name: Run Tests
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
     branches: [ develop, master ]
 
 jobs:
@@ -18,6 +18,71 @@ jobs:
             const unchecked = (body.match(/^- \[ \]/gm) || []).length;
             if (unchecked > 0) {
               core.setFailed(`${unchecked} checklist item(s) unchecked. Complete all items before merging.`);
+            }
+
+  # Required check. MUST always report a status (never skip the job), otherwise a
+  # non-feature PR (docs/*, chore/*, release/* back-merge) would sit forever as
+  # "pending" and auto-merge would never fire. The feature/* gate lives INSIDE the
+  # script so non-target heads pass immediately. See GitFlowPipeline.md Key Point 1.
+  version-label:
+    name: Verify Version Label
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Require exactly one version label on feature PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const head = context.payload.pull_request.head.ref;
+            if (!head.startsWith('feature/')) {
+              core.info(`head '${head}' is not feature/*, version label not required.`);
+              return;
+            }
+            const bumps = ['major', 'minor', 'patch'];
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            const present = labels.filter(n => bumps.includes(n));
+            if (present.length !== 1) {
+              core.setFailed(
+                `feature/* PR needs exactly one of major/minor/patch (found ${present.length}: ` +
+                `[${present.join(', ')}]). Add exactly one bump label.`
+              );
+            } else {
+              core.info(`bump label = ${present[0]}`);
+            }
+
+  # Required check enforcing the strict-1:1 serialization: no feature may merge
+  # while a release/* or hotfix/* is open. Same "always run, gate inside script"
+  # rule as above. Stale-green is closed by the Ruleset "Require branches to be up
+  # to date". See GitFlowPipeline.md Key Point 4.
+  serialize-guard:
+    name: Serialize Guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read        # listMatchingRefs (git refs) needs contents:read
+    steps:
+      - name: Block feature merge while a release/hotfix is open
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const head = context.payload.pull_request.head.ref;
+            if (!head.startsWith('feature/')) {
+              core.info(`head '${head}' is not feature/*, serialization gate skipped.`);
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const open = [];
+            for (const prefix of ['heads/release/', 'heads/hotfix/']) {
+              const refs = await github.rest.git.listMatchingRefs({ owner, repo, ref: prefix });
+              open.push(...refs.data.map(r => r.ref.replace('refs/heads/', '')));
+            }
+            if (open.length > 0) {
+              core.setFailed(
+                `A release/hotfix is in progress: [${open.join(', ')}]. ` +
+                `Wait until it is finalized and its branch is deleted before merging.`
+              );
+            } else {
+              core.info('No open release/hotfix. Feature may proceed.');
             }
 
   test:

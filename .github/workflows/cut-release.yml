@@ -1,0 +1,126 @@
+name: Cut Release Branch
+
+# Trigger 1 (GitFlowPipeline.md §1): when a feature/* PR merges into develop,
+# automatically cut release/vX.Y.Z from develop. No tag is created yet — the tag
+# and the master/develop merges wait for the manual "Finish release" (finalize.yml).
+#
+# IMPORTANT: trigger on `pull_request: closed` with a feature/* head — NOT on
+# `push: develop`. A push trigger would also fire on the release→develop back-merge
+# and cut releases forever.
+on:
+  pull_request:
+    types: [closed]
+    branches: [develop]
+
+jobs:
+  cut-release:
+    name: Cut release branch
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.merged == true && startsWith(github.head_ref, 'feature/') }}
+    permissions:
+      contents: write        # create the release/* ref
+      pull-requests: read
+    steps:
+      # Guard: strict 1:1 (Key Point 4) should already prevent this, but never cut
+      # a second release if one is somehow open.
+      - name: Ensure no release/hotfix is already open
+        id: guard
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const open = [];
+            for (const prefix of ['heads/release/', 'heads/hotfix/']) {
+              const refs = await github.rest.git.listMatchingRefs({ owner, repo, ref: prefix });
+              open.push(...refs.data.map(r => r.ref.replace('refs/heads/', '')));
+            }
+            if (open.length > 0) {
+              core.warning(`release/hotfix already open: [${open.join(', ')}]. Skipping cut.`);
+              core.setOutput('skip', 'true');
+            } else {
+              core.setOutput('skip', 'false');
+            }
+
+      # per-feature model → exactly one bump label on the feature PR (enforced by the
+      # Verify Version Label required check). Read it straight from the PR payload.
+      - name: Determine bump from PR label
+        if: ${{ steps.guard.outputs.skip == 'false' }}
+        id: bump
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const bumps = ['major', 'minor', 'patch'];
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            const present = labels.filter(n => bumps.includes(n));
+            if (present.length !== 1) {
+              core.setFailed(`Expected exactly one of major/minor/patch, found [${present.join(', ')}].`);
+              return;
+            }
+            core.setOutput('bump', present[0]);
+
+      - name: Checkout develop (post-merge tip)
+        if: ${{ steps.guard.outputs.skip == 'false' }}
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0        # need full history + tags for git describe
+
+      # Version base = the tag topologically reachable from develop, NOT the highest
+      # numeric tag. The repo carries an orphan v1.4.0 (pre-rename) that must be
+      # ignored; after the bootstrap sync, develop's reachable tag is v1.0.0.
+      - name: Compute next version
+        if: ${{ steps.guard.outputs.skip == 'false' }}
+        id: ver
+        shell: bash
+        env:
+          BUMP: ${{ steps.bump.outputs.bump }}
+        run: |
+          set -euo pipefail
+          base="$(git describe --tags --abbrev=0)"
+          echo "base tag reachable from develop: $base"
+          ver="${base#v}"
+          IFS='.' read -r X Y Z <<< "$ver"
+          case "$BUMP" in
+            major) X=$((X+1)); Y=0; Z=0 ;;
+            minor) Y=$((Y+1)); Z=0 ;;
+            patch) Z=$((Z+1)) ;;
+            *) echo "unknown bump: $BUMP" >&2; exit 1 ;;
+          esac
+          next="v${X}.${Y}.${Z}"
+          echo "next version: $next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create release branch with an opening commit
+        if: ${{ steps.guard.outputs.skip == 'false' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.ver.outputs.version }}';
+            const { owner, repo } = context.repo;
+            const dev = await github.rest.git.getRef({ owner, repo, ref: 'heads/develop' });
+            const parent = dev.data.object.sha;
+            const parentCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: parent });
+
+            // Put an empty commit (same tree as develop tip) on the release branch so it
+            // always has at least one commit beyond develop. Otherwise, if no
+            // stabilization fixes are added, the release→develop back-merge PR would have
+            // no diff and cannot be opened (GitHub 422), stalling finalize/post-merge.
+            // The tag later lands on this commit, making it the shared ancestor of
+            // master and develop.
+            const commit = await github.rest.git.createCommit({
+              owner, repo,
+              message: `chore(release): open ${version}\n\nStabilization branch cut from develop. Add fixes here, then run "Finish release".`,
+              tree: parentCommit.data.tree.sha,
+              parents: [parent],
+            });
+            const branch = `release/${version}`;
+            try {
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+              core.notice(`Created ${branch} at ${commit.data.sha.slice(0, 7)} (opening commit). Run "Finish release" when stabilized.`);
+            } catch (e) {
+              if (e.status === 422) {
+                core.warning(`Branch ${branch} already exists — skipping creation.`);
+              } else {
+                throw e;
+              }
+            }
