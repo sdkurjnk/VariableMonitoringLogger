@@ -43,6 +43,34 @@ class TestTraceDispatcherFrameRelevance(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    def test_active_ancestor_with_shadowing_local_is_not_traced(self):
+        global MODULE_LEVEL_COUNTER
+        MODULE_LEVEL_COUNTER = {"value": 0}
+        ancestor_tracking = []
+
+        def outer():
+            MODULE_LEVEL_COUNTER = "shadowed local"
+
+            def register_global():
+                self.dispatcher.register(
+                    "MODULE_LEVEL_COUNTER",
+                    frame=sys._getframe(),
+                )
+
+            register_global()
+
+            ancestor_tracking.append(
+                sys._getframe() in self.dispatcher._frame_states
+            )
+            self.assertEqual(
+                MODULE_LEVEL_COUNTER,
+                "shadowed local",
+            )
+
+        outer()
+
+        self.assertEqual(ancestor_tracking, [False])
+
     def test_unresolved_registration_spreads_relevance_across_module_frames(self):
         # A registration whose variable does not exist anywhere yet cannot be
         # scoped to a single code object in advance (we don't know which

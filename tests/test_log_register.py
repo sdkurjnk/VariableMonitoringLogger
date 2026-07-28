@@ -141,6 +141,46 @@ class TestRegisterPublicAPI(unittest.TestCase):
         self.assertEqual(a_entries[-1]["domain"], "GLOBAL")
         self.assertEqual(a_entries[-1]["func"], "<module>")
 
+    def test_global_update_in_active_parent_function_is_tracked(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_scenario(self, temp_dir, """
+                import oscilo
+
+                A = 10
+
+                def outer():
+                    global A
+
+                    def register_a():
+                        oscilo.register("A")
+
+                    register_a()
+                    A = 20
+
+                    checkpoint = "after parent update"
+                    print(checkpoint)
+
+                outer()
+            """)
+
+            entries = read_default_log(self, temp_dir)
+
+        a_entries = [
+            entry
+            for entry in entries
+            if entry["name"] == "A"
+        ]
+
+        self.assertEqual(
+            events_for(entries, "A"),
+            [
+                ("init", 10),
+                ("updated", 20),
+            ],
+        )
+        self.assertEqual(a_entries[-1]["domain"], "GLOBAL")
+        self.assertEqual(a_entries[-1]["func"], "outer")
+
     def test_import_only_leaves_no_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             run_scenario(self, temp_dir, "import oscilo\n")
