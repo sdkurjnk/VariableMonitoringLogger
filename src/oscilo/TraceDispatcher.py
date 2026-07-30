@@ -504,6 +504,13 @@ class TraceDispatcher:
             if local_relevant or global_relevant:
                 self._ensure_frame_tracking(current_frame)
 
+            # <module> frame은 이 실행 단위(파일, exec() 호출, Jupyter 셀 등)의
+            # 최상단이다. 여기서 멈추지 않으면, 같은 globals dict를 재사용하는
+            # 무관한 실행 단위(중첩 exec, 노트북 셀 러너 등)나 이 파일을 호출한
+            # 인터프리터/테스트 러너 frame까지 조상으로 착각해 추적을 붙이게 된다.
+            if current_frame.f_code.co_name == "<module>":
+                break
+
             current_frame = current_frame.f_back
 
     def _trace_calls(self, frame, event, arg):
