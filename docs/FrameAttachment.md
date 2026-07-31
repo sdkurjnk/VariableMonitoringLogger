@@ -2,7 +2,7 @@
 
 `TraceDispatcher`가 어떤 프레임에 라인 트레이싱을 걸지 결정하는 방식을 정리한다.
 
-관련 코드: `TraceDispatcher._trace_calls`, `_ensure_frame_tracking`, `_make_line_tracer`, `register`
+관련 코드: `TraceDispatcher._trace_calls`, `_ensure_frame_tracking`, `_ensure_active_ancestor_tracking`, `_make_line_tracer`, `register`
 
 ---
 
@@ -35,7 +35,9 @@ frame_state = self._ensure_frame_tracking(frame) #TrcerDispathcer.py - line 260
 
 추적 가능 기준은 스택상의 위치가 아니라 **`sys.settrace` 호출 시점 대비 프레임의 생성 시점**이다.
 
-수동 부착은 등록 프레임 **하나**만 대상으로 한다. 즉 register 이전부터 실행 중이던 조상 프레임은 수동 부착 대상이 아니며, 그 안에서 일어나는 변경은 잡히지 않는다. 추적하려는 변수가 등록 프레임에 있다는 전제에 기댄 선택이다.
+수동 부착은 등록 프레임에서 끝나지 않는다. 등록 프레임의 지역 변수를 shadowing 없이 참조할 수 있는 조상 프레임(같은 code 객체를 재귀 중인 프레임, 또는 같은 globals dict를 쓰는 프레임)에서 일어나는 변경도 잡아야 하므로, `register()`는 `_ensure_active_ancestor_tracking(frame)`으로 `frame.f_back`을 거슬러 올라가며 각 조상에 대해 `_relevant_for()`로 관련 여부를 판정하고, 관련 있는 프레임에만 라인 트레이서를 붙인다.
+
+이 탐색은 무한정 올라가지 않는다. `co_name == "<module>"`인 프레임을 만나면 그 프레임까지는 처리하고 즉시 멈춘다. `<module>` 프레임은 이 실행 단위(대상 파일, 하나의 `exec()` 호출, 하나의 Jupyter 셀)의 최상단이기 때문이다. 여기서 멈추지 않으면, 같은 globals dict를 재사용하는 무관한 실행 단위(중첩 `exec()`, 노트북 셀 러너)나 이 코드를 호출한 인터프리터/테스트 러너 프레임까지 관련 있다고 잘못 판정해 추적을 붙이게 된다.
 
 ## 라인 트레이서를 프레임마다 새로 만드는 이유
 
