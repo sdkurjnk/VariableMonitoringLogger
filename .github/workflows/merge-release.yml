@@ -1,0 +1,82 @@
+name: Merge Release / Hotfix
+
+# Closes the gap finalize.yml leaves open. finalize only ENABLES auto-merge on the
+# release/*→master and →develop PRs, but GitHub auto-merge does NOT use the App's
+# ruleset bypass — so with the "require-approval" ruleset active (1 approval +
+# require_last_push_approval) those PRs sit at REVIEW_REQUIRED forever.
+#
+# Bypass is a permission to MERGE despite a rule, not an automatic action: it only
+# takes effect when the bypass actor actually performs the merge. So here the App
+# merges the PRs DIRECTLY (pulls.merge) once CI is green. The App is a bypass actor on
+# require-approval, so the approval rule is bypassed. require-ci-* have no bypass but
+# are already satisfied — that is exactly what "Run Tests" success means — and
+# require-uptodate-develop is bypassed too. See GitFlowPipeline.md §2.
+#
+# Triggered by workflow_run (not pull_request) because at finalize time CI is still
+# pending; we can only merge once the checks report success. This file must live on
+# the default branch (master) for workflow_run to fire.
+on:
+  workflow_run:
+    workflows: ["Run Tests"]
+    types: [completed]
+
+# Both release PRs share the same head branch and their two Run Tests runs finish near
+# each other. Serialize per-branch and keep pulls.merge idempotent (405/409 tolerated)
+# so we never double-merge or fail on an already-merged PR.
+concurrency:
+  group: merge-release-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    name: Merge release/hotfix PRs directly
+    runs-on: ubuntu-latest
+    # Only for a green Run Tests on a release/* or hotfix/* head.
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      (startsWith(github.event.workflow_run.head_branch, 'release/') ||
+       startsWith(github.event.workflow_run.head_branch, 'hotfix/'))
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Merge open release/hotfix PRs (App bypasses approval)
+        uses: actions/github-script@v7
+        with:
+          # App token so the merge actor IS the App — the ruleset bypass actor. A merge
+          # with GITHUB_TOKEN would not carry the bypass and would stay blocked.
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = context.payload.workflow_run.head_branch;
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', head: `${owner}:${branch}`, per_page: 100,
+            });
+            const targets = prs.filter(p => ['master', 'develop'].includes(p.base.ref));
+            if (targets.length === 0) {
+              core.notice(`No open ${branch} → master/develop PRs; nothing to merge.`);
+              return;
+            }
+
+            for (const pr of targets) {
+              try {
+                await github.rest.pulls.merge({
+                  owner, repo, pull_number: pr.number, merge_method: 'merge',
+                });
+                core.notice(`Merged #${pr.number} (${branch} → ${pr.base.ref}).`);
+              } catch (e) {
+                // 405: not mergeable yet (the OTHER PR's checks may still be pending) —
+                //      that PR's own Run Tests completion re-triggers this workflow.
+                // 409: base moved between list and merge — same re-trigger covers it.
+                if (e.status === 405 || e.status === 409) {
+                  core.warning(`#${pr.number} not mergeable yet (${e.status}); will retry on next run.`);
+                } else {
+                  throw e;
+                }
+              }
+            }
