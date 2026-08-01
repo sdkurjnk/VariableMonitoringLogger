@@ -4,7 +4,10 @@ name: Finish Release / Hotfix
 # it" — then everything is unattended:
 #   1. tag vX.Y.Z at the release/hotfix tip
 #   2. open branch→master and branch→develop PRs (App token, so test.yml triggers)
-#   3. enable auto-merge on both (Ruleset A bypasses approval for the App)
+#   3. enable auto-merge on both as a FALLBACK (fires only if a human approves)
+# The real merge is done by merge-release.yml: the App merges directly once CI is
+# green, which is what actually bypasses require-approval — GitHub auto-merge does NOT
+# use the App's ruleset bypass, so on its own it would sit at REVIEW_REQUIRED forever.
 # The GitHub Release + branch deletion happen later in post-merge.yml, only after
 # BOTH PRs merge (§2 note: 2→3 is not a synchronous continuation).
 #
@@ -101,8 +104,9 @@ jobs:
               } else {
                 core.notice(`Reusing existing ${branch} → ${base} (#${pr.number}).`);
               }
-              // Enable auto-merge (Ruleset A bypasses approval for the App; Ruleset B
-              // still requires CI green before this merges).
+              // Enable auto-merge as a FALLBACK only (fires if a human approves).
+              // The primary merge path is merge-release.yml, where the App merges
+              // directly once CI is green — auto-merge does NOT use the App's bypass.
               await github.graphql(
                 `mutation($id: ID!) {
                    enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: MERGE }) {
