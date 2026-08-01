@@ -31,7 +31,7 @@ frame_state = self._ensure_frame_tracking(frame) #TrcerDispathcer.py - line 260
 | 경로 | 대상 | 시점 |
 |---|---|---|
 | `_trace_calls` (자동) | register 이후 새로 생성되는 프레임 | "call" 이벤트 시 |
-| `register()` (수동) | 등록 시점의 호출자 프레임 | register 실행 중 |
+| `register()` (수동) | 모듈 범위 내 관련 프레임 | register 실행 중 |
 
 추적 가능 기준은 스택상의 위치가 아니라 **`sys.settrace` 호출 시점 대비 프레임의 생성 시점**이다.
 
