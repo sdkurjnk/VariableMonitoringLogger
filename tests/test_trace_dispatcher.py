@@ -43,6 +43,81 @@ class TestTraceDispatcherFrameRelevance(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    def test_active_ancestor_with_shadowing_local_is_not_traced(self):
+        global MODULE_LEVEL_COUNTER
+        MODULE_LEVEL_COUNTER = {"value": 0}
+        ancestor_tracking = []
+
+        def outer():
+            MODULE_LEVEL_COUNTER = "shadowed local"
+
+            def register_global():
+                self.dispatcher.register(
+                    "MODULE_LEVEL_COUNTER",
+                    frame=sys._getframe(),
+                )
+
+            register_global()
+
+            ancestor_tracking.append(
+                sys._getframe() in self.dispatcher._frame_states
+            )
+            self.assertEqual(
+                MODULE_LEVEL_COUNTER,
+                "shadowed local",
+            )
+
+        outer()
+
+        self.assertEqual(ancestor_tracking, [False])
+
+    def test_active_ancestor_tracking_stops_at_module_frame_boundary(self):
+        # A nested exec() that reuses this module's globals() dict (the same
+        # pattern a Jupyter cell or a dynamic-code loader uses) creates a
+        # second "<module>" frame sharing globals identity with this test's
+        # own frame. Ancestor tracking must stop once it reaches that nested
+        # <module> frame instead of climbing past it into the real caller,
+        # which only happens to share the same globals dict by coincidence.
+        # Membership is checked while each frame is still on the stack,
+        # since return-cleanup would otherwise pop it before we can inspect it.
+        global MODULE_LEVEL_COUNTER
+        MODULE_LEVEL_COUNTER = {"value": 0}
+        tracked = {}
+
+        def register_global():
+            self.dispatcher.register(
+                "MODULE_LEVEL_COUNTER",
+                frame=sys._getframe(),
+            )
+
+        exec_globals = globals()
+        exec_globals["_boundary_test_register"] = register_global
+        exec_globals["_boundary_test_tracked"] = tracked
+        exec_globals["_boundary_test_dispatcher"] = self.dispatcher
+        source = (
+            "import sys\n"
+            "def _nested_caller():\n"
+            "    _boundary_test_register()\n"
+            "    _boundary_test_tracked['nested_caller'] = ("
+            "sys._getframe() in _boundary_test_dispatcher._frame_states)\n"
+            "_nested_caller()\n"
+            "_boundary_test_tracked['module'] = ("
+            "sys._getframe() in _boundary_test_dispatcher._frame_states)\n"
+        )
+
+        try:
+            exec(compile(source, "<ancestor-boundary-test>", "exec"), exec_globals)
+        finally:
+            del exec_globals["_boundary_test_register"]
+            del exec_globals["_boundary_test_tracked"]
+            del exec_globals["_boundary_test_dispatcher"]
+
+        caller_tracked = sys._getframe() in self.dispatcher._frame_states
+
+        self.assertTrue(tracked["nested_caller"])
+        self.assertTrue(tracked["module"])
+        self.assertFalse(caller_tracked)
+
     def test_unresolved_registration_spreads_relevance_across_module_frames(self):
         # A registration whose variable does not exist anywhere yet cannot be
         # scoped to a single code object in advance (we don't know which
@@ -338,6 +413,9 @@ class TestTraceDispatcherStopCleanup(unittest.TestCase):
         self.buffer = HistoryBuffer()
         self.dispatcher = TraceDispatcher(self.buffer)
 
+    def tearDown(self):
+        self.dispatcher.stop()
+
     def test_stop_clears_call_context_and_frame_state(self):
         def recurse(n):
             acc = n
@@ -352,6 +430,79 @@ class TestTraceDispatcherStopCleanup(unittest.TestCase):
         self.assertEqual(self.dispatcher._context_manager._cleanup_traces, {})
         self.assertEqual(self.dispatcher._frame_states, {})
         self.assertEqual(self.dispatcher._trackers, [])
+
+    def test_active_ancestor_states_are_isolated_and_removed_on_return(self):
+        global MODULE_LEVEL_COUNTER
+        MODULE_LEVEL_COUNTER = {"value": 0}
+        returned_frames = []
+
+        def outer():
+            def register_global():
+                self.dispatcher.register(
+                    "MODULE_LEVEL_COUNTER",
+                    frame=sys._getframe(),
+                )
+
+            register_global()
+
+            outer_frame = sys._getframe()
+            parent_frame = outer_frame.f_back
+
+            self.assertIn(
+                outer_frame,
+                self.dispatcher._frame_states,
+            )
+            self.assertIn(
+                parent_frame,
+                self.dispatcher._frame_states,
+            )
+            self.assertIsNot(
+                self.dispatcher._frame_states[outer_frame],
+                self.dispatcher._frame_states[parent_frame],
+            )
+
+            returned_frames.append(outer_frame)
+
+        outer()
+
+        self.assertNotIn(
+            returned_frames[0],
+            self.dispatcher._frame_states,
+        )
+        self.assertIn(
+            sys._getframe(),
+            self.dispatcher._frame_states,
+        )
+
+    def test_stop_clears_active_ancestor_frame_state(self):
+        global MODULE_LEVEL_COUNTER
+        MODULE_LEVEL_COUNTER = {"value": 0}
+
+        def register_global():
+            self.dispatcher.register(
+                "MODULE_LEVEL_COUNTER",
+                frame=sys._getframe(),
+            )
+
+        register_global()
+
+        active_ancestor = sys._getframe()
+
+        self.assertIn(
+            active_ancestor,
+            self.dispatcher._frame_states,
+        )
+
+        self.dispatcher.stop()
+
+        self.assertNotIn(
+            active_ancestor,
+            self.dispatcher._frame_states,
+        )
+        self.assertEqual(
+            self.dispatcher._frame_states,
+            {},
+        )
 
 
 if __name__ == "__main__":
