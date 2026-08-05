@@ -70,6 +70,8 @@ C 호출도 공짜가 아니므로 `VariableTracker.check`가 앞에서 한 번 
 
 `get_snapshot()`은 저장된 스냅샷을 다시 깊은 복사해 돌려준다. 호출자가 반환값을 변형하면 내부 기준값이 오염돼 이후 비교가 전부 틀어지기 때문이다. 같은 이유로 `HistoryBuffer.getHistory()`도 깊은 복사를 반환한다.
 
+이 두 번째 deepcopy도 실패할 수 있다 — `__deepcopy__`가 원본과 다른, 그 자체로 복사 불가능한 객체를 돌려주는 경우다. `_make_state`의 최초 deepcopy 실패와 동일하게 `copy`를 `None`으로, `copy_failed`를 `True`로 낮춰 이후 `check`가 참조 비교만으로 처리하도록 한다.
+
 ## Python 3.13+ 대응
 
 3.13부터 `frame.f_locals`가 프록시로 노출될 수 있어 C 코드는 버전별로 조회를 나눈다.

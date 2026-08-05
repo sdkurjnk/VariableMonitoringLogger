@@ -66,6 +66,12 @@ class VariableTracker:
 
         return None
 
+    def _safe_repr(self, value):
+        try:
+            return repr(value)
+        except Exception:
+            return "<unrepresentable>"
+
     def get_snapshot(self, state):
         if state is None:
             return None
@@ -75,15 +81,26 @@ class VariableTracker:
                 # The reference itself could not be deepcopy'd, so it is not
                 # safe to hand out raw (e.g. a lock reaching HistoryBuffer /
                 # json.dumps). Fall back to a JSON-serializable placeholder.
-                try:
-                    return repr(state["ref"])
-                except Exception:
-                    return "<unrepresentable>"
+                return self._safe_repr(state["ref"])
 
             return state["ref"]
 
         # Do not expose the stored mutable snapshot directly to callers.
-        return copy.deepcopy(state["copy"])
+        try:
+            return copy.deepcopy(state["copy"])
+        except Exception:
+            # The initial deepcopy in _make_state() succeeded, but the copy it
+            # produced is itself uncopyable (e.g. __deepcopy__ hands back a
+            # lock). Demote state in place so future check() calls fall back
+            # to identity-only comparison instead of retrying this deepcopy
+            # and raising again on every subsequent line event. This is safe
+            # because get_snapshot() has exactly one production caller
+            # (TraceDispatcher._log_event), which always receives the same
+            # dict object already stored by _check_and_log, so the demotion
+            # is observed by later check() calls on that state.
+            state["copy"] = None
+            state["copy_failed"] = True
+            return self._safe_repr(state["ref"])
 
     def check(
         self,
@@ -114,8 +131,11 @@ class VariableTracker:
         previous_ref = prev_state["ref"]
         previous_copy = prev_state["copy"]
 
-        # Atomic values do not have a snapshot. Reference identity is enough
-        # because they cannot contain independently mutable state.
+        # previous_copy is None means either: the value is atomic (no snapshot
+        # was ever needed, safe to compare by identity), or a deepcopy failed
+        # and the state was demoted to identity-only comparison. In the
+        # demoted case the value may still be genuinely mutable, so an
+        # in-place mutation with no reassignment will not be detected here.
         if previous_copy is None:
             if current_value is previous_ref:
                 return NO_CHANGE_EVENT, prev_state
