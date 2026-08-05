@@ -39,13 +39,22 @@ class VariableTracker:
         # can be compared by identity alone. Containers need a detached snapshot
         # because they may hold mutable objects even when the container is immutable.
         snapshot = None
+        copy_failed = False
 
         if not isinstance(value, _FRAME_STATE_ATOMIC_TYPES):
-            snapshot = copy.deepcopy(value)
+            try:
+                snapshot = copy.deepcopy(value)
+            except Exception:
+                # Not everything is deepcopy-able (locks, sockets, file handles,
+                # or containers hiding one of those). Fall back to identity-only
+                # comparison instead of letting this escape the trace callback.
+                snapshot = None
+                copy_failed = True
 
         return {
             "ref": value,
             "copy": snapshot,
+            "copy_failed": copy_failed,
         }
 
     def _get_current_value(self, frame, domain, varName):
@@ -62,6 +71,15 @@ class VariableTracker:
             return None
 
         if state["copy"] is None:
+            if state["copy_failed"]:
+                # The reference itself could not be deepcopy'd, so it is not
+                # safe to hand out raw (e.g. a lock reaching HistoryBuffer /
+                # json.dumps). Fall back to a JSON-serializable placeholder.
+                try:
+                    return repr(state["ref"])
+                except Exception:
+                    return "<unrepresentable>"
+
             return state["ref"]
 
         # Do not expose the stored mutable snapshot directly to callers.
