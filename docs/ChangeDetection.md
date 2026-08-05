@@ -48,7 +48,9 @@
 
 ## 파이썬 쪽 사전 분기
 
-C 호출도 공짜가 아니므로 `VariableTracker.check`가 앞에서 한 번 더 거른다. 원자 타입(`int`, `float`, `bool`, `complex`, `str`, `bytes`, `None`)은 `_make_state`에서 스냅샷을 만들지 않으며, `state["copy"]`가 `None`이라는 사실 자체가 원자 타입 표식이 되어 참조 비교만으로 끝나고 C를 호출하지 않는다.
+C 호출도 공짜가 아니므로 `VariableTracker.check`가 앞에서 한 번 더 거른다. 원자 타입(`int`, `float`, `bool`, `complex`, `str`, `bytes`, `None`)은 `_make_state`에서 스냅샷을 만들지 않으며, `state["copy"]`가 `None`이면 참조 비교만으로 끝나고 C를 호출하지 않는다.
+
+다만 `state["copy"]`가 `None`인 이유는 두 가지다: 원자 타입이라 애초에 스냅샷이 불필요했거나, `deepcopy`를 시도했지만 실패했거나. 이를 구분하는 게 `state["copy_failed"]` 플래그다. `threading.Lock`, 파일 핸들, 소켓, 제너레이터처럼 deepcopy가 불가능한 값(혹은 그런 값을 품은 중첩 컨테이너)은 사전 타입 검사로 걸러내지 않는다 — 중첩 구조 속 복사 불가 객체를 미리 다 찾아내는 게 원천적으로 불완전하기 때문이다. 대신 `_make_state`가 `deepcopy`를 `try/except`로 감싸, 실패하면 `copy`를 `None`으로 두고 `copy_failed`를 `True`로 켠다. 두 경우 모두 `copy is None`이라 `check`는 동일하게 참조 비교만으로 끝나지만, 원자 타입은 애초에 제자리 수정이 불가능해 참조 비교로 충분한 반면 복사 실패 값은 진짜 가변 객체일 수 있어 참조가 유지된 채 내용만 바뀌는 in-place 변경을 놓칠 수 있다. 이 트레이드오프는 감수한다 — 감지를 놓치는 것이 트레이스 콜백에서 예외를 던져 추적 대상 프로그램 자체를 중단시키는 것보다 낫기 때문이다.
 
 ## C 확장으로 뺀 이유
 
