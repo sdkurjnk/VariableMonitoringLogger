@@ -1,4 +1,6 @@
+import json
 import sys
+import threading
 import unittest
 
 from oscilo.VariableTracker import (
@@ -20,6 +22,15 @@ FRAME_STATE_GLOBAL_VALUE = ["before"]
 class MutableValue:
     def __init__(self, value):
         self.value = value
+
+
+class UnrepresentableValue:
+    # Fails deepcopy and repr so both fallback paths can be exercised.
+    def __deepcopy__(self, memo):
+        raise TypeError("cannot deepcopy UnrepresentableValue")
+
+    def __repr__(self):
+        raise RuntimeError("cannot repr UnrepresentableValue")
 
 
 class TestVariableTrackerState(unittest.TestCase):
@@ -389,6 +400,98 @@ class TestVariableTrackerState(unittest.TestCase):
 
         self.assertEqual(event_name, INIT_EVENT)
         self.assertEqual(state["copy"], ["second"])
+
+    def test_make_state_flags_copy_failure_for_unpicklable_value(self):
+        value = threading.Lock()
+
+        state = self.tracker._make_state(value)
+
+        self.assertIs(state["ref"], value)
+        self.assertIsNone(state["copy"])
+        self.assertTrue(state["copy_failed"])
+
+    def test_make_state_detects_copy_failure_inside_nested_container(self):
+        value = {"a": [threading.Lock()]}
+
+        state = self.tracker._make_state(value)
+
+        self.assertIs(state["ref"], value)
+        self.assertIsNone(state["copy"])
+        self.assertTrue(state["copy_failed"])
+
+    def test_make_state_success_and_atomic_paths_set_copy_failed_false(self):
+        atomic_state = self.tracker._make_state("ready")
+        mutable_state = self.tracker._make_state([1, 2])
+
+        self.assertFalse(atomic_state["copy_failed"])
+        self.assertFalse(mutable_state["copy_failed"])
+
+    def test_get_snapshot_returns_json_serializable_value_for_copy_failure(self):
+        value = threading.Lock()
+        state = self.tracker._make_state(value)
+
+        snapshot = self.tracker.get_snapshot(state)
+
+        self.assertEqual(snapshot, repr(value))
+        json.dumps(snapshot)  # Must not raise.
+
+    def test_get_snapshot_falls_back_when_repr_raises(self):
+        state = self.tracker._make_state(UnrepresentableValue())
+
+        snapshot = self.tracker.get_snapshot(state)
+
+        self.assertEqual(snapshot, "<unrepresentable>")
+        json.dumps(snapshot)  # Must not raise.
+
+    def test_check_demotes_copy_failure_state_to_identity_only_comparison(self):
+        target = threading.Lock()
+        frame = sys._getframe()
+
+        event_name, state = self.tracker.check(
+            frame,
+            LOCAL,
+            "target",
+            None,
+        )
+
+        self.assertEqual(event_name, INIT_EVENT)
+        self.assertTrue(state["copy_failed"])
+
+        # Same lock object kept across checks must settle on NO_CHANGE_EVENT
+        # instead of re-attempting deepcopy and spamming UPDATED_EVENT.
+        for _ in range(3):
+            event_name, state = self.tracker.check(
+                frame,
+                LOCAL,
+                "target",
+                state,
+            )
+            self.assertEqual(event_name, NO_CHANGE_EVENT)
+
+    def test_check_transitions_from_copy_failure_state_on_reassignment(self):
+        target = threading.Lock()
+        frame = sys._getframe()
+
+        event_name, state = self.tracker.check(
+            frame,
+            LOCAL,
+            "target",
+            None,
+        )
+        self.assertEqual(event_name, INIT_EVENT)
+
+        target = 42
+
+        event_name, state = self.tracker.check(
+            frame,
+            LOCAL,
+            "target",
+            state,
+        )
+
+        self.assertEqual(event_name, UPDATED_EVENT)
+        self.assertEqual(state["ref"], 42)
+        self.assertFalse(state["copy_failed"])
 
     def test_recursive_frames_keep_independent_states(self):
         tracker = VariableTracker("n")

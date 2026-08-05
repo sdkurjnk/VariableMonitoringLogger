@@ -131,6 +131,64 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
         self.assertEqual(second_logs[-1]["event"], "updated")
         self.assertEqual(second_logs[-1]["data"], "after")
 
+    def test_register_on_unpicklable_value_does_not_crash_traced_program(self):
+        # Case 1 from oscilo issue #51: registering a value that cannot be
+        # deepcopy'd (threading.Lock) must not let TypeError from
+        # sys.settrace's callback escape into the traced program.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script = textwrap.dedent("""
+                import threading
+                import oscilo
+
+                def run():
+                    lock = threading.Lock()
+                    oscilo.register("lock")
+                    print("done")
+
+                run()
+            """)
+
+            logs = run_script_and_read_logs(self, script, temp_dir)
+
+        self.assertEqual(logs[0]["name"], "lock")
+        self.assertEqual(logs[0]["event"], "init")
+        self.assertIsInstance(logs[0]["data"], str)
+
+    def test_reassigning_tracked_value_to_unpicklable_value_keeps_running(self):
+        # Case 2 from oscilo issue #51: assigning an unpicklable value to an
+        # already-tracked variable used to raise TypeError from inside the
+        # trace callback, aborting the traced program before it finished.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script = textwrap.dedent("""
+                import threading
+                import oscilo
+
+                def run():
+                    data = [1, 2, 3]
+                    oscilo.register("data")
+                    data = threading.Lock()
+                    x = 42
+                    print("end", x)
+
+                run()
+            """)
+
+            result = run_python_script(script, temp_dir)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("end 42", result.stdout)
+
+            log_file = os.path.join(temp_dir, DEFAULT_LOG_NAME)
+            self.assertTrue(os.path.exists(log_file))
+            logs = read_jsonl(log_file)
+
+        data_logs = [entry for entry in logs if entry["name"] == "data"]
+
+        self.assertEqual(data_logs[0]["event"], "init")
+        self.assertEqual(data_logs[0]["data"], [1, 2, 3])
+        self.assertEqual(data_logs[-1]["event"], "updated")
+        self.assertIsInstance(data_logs[-1]["data"], str)
+
     def test_process_log_uses_jsonl_schema_after_exit(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
