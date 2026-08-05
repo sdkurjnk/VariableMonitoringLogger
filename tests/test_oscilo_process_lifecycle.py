@@ -154,6 +154,43 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
         self.assertEqual(logs[0]["event"], "init")
         self.assertIsInstance(logs[0]["data"], str)
 
+    def test_register_on_value_whose_copy_is_itself_uncopyable_does_not_crash(self):
+        # The initial deepcopy in _make_state() succeeds here (__deepcopy__
+        # doesn't raise), but hands back a lock. The second deepcopy inside
+        # get_snapshot() then fails while building the log entry, which must
+        # not let TypeError escape the trace callback and abort the program.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script = textwrap.dedent("""
+                import threading
+                import oscilo
+
+                class CopyReturnsUncopyable:
+                    def __deepcopy__(self, memo):
+                        return threading.Lock()
+
+                def run():
+                    target = CopyReturnsUncopyable()
+                    oscilo.register("target")
+                    checkpoint = "program continued"
+                    print(checkpoint)
+
+                run()
+            """)
+
+            result = run_python_script(script, temp_dir)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("program continued", result.stdout)
+
+            log_file = os.path.join(temp_dir, DEFAULT_LOG_NAME)
+            self.assertTrue(os.path.exists(log_file))
+            logs = read_jsonl(log_file)
+
+        target_logs = [entry for entry in logs if entry["name"] == "target"]
+
+        self.assertEqual(target_logs[0]["event"], "init")
+        self.assertIsInstance(target_logs[0]["data"], str)
+
     def test_reassigning_tracked_value_to_unpicklable_value_keeps_running(self):
         # Case 2 from oscilo issue #51: assigning an unpicklable value to an
         # already-tracked variable used to raise TypeError from inside the

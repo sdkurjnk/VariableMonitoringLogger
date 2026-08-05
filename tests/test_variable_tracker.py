@@ -33,6 +33,12 @@ class UnrepresentableValue:
         raise RuntimeError("cannot repr UnrepresentableValue")
 
 
+class CopyReturnsUncopyable:
+    # Deepcopy succeeds but hands back an object that cannot itself be copied.
+    def __deepcopy__(self, memo):
+        return threading.Lock()
+
+
 class TestVariableTrackerState(unittest.TestCase):
     def setUp(self):
         self.tracker = VariableTracker("target")
@@ -492,6 +498,33 @@ class TestVariableTrackerState(unittest.TestCase):
         self.assertEqual(event_name, UPDATED_EVENT)
         self.assertEqual(state["ref"], 42)
         self.assertFalse(state["copy_failed"])
+
+    def test_get_snapshot_demotes_state_when_second_deepcopy_fails(self):
+        value = CopyReturnsUncopyable()
+        state = self.tracker._make_state(value)
+
+        # Precondition: the initial deepcopy in _make_state() must succeed,
+        # since __deepcopy__ only returns an uncopyable object, it doesn't
+        # raise. Only the second deepcopy inside get_snapshot() should fail.
+        self.assertFalse(state["copy_failed"])
+        self.assertIsNotNone(state["copy"])
+
+        snapshot = self.tracker.get_snapshot(state)
+
+        self.assertIsInstance(snapshot, str)
+        json.dumps(snapshot)  # Must not raise.
+
+        self.assertIsNone(state["copy"])
+        self.assertTrue(state["copy_failed"])
+
+    def test_get_snapshot_stays_stable_across_repeated_calls_after_demotion(self):
+        state = self.tracker._make_state(CopyReturnsUncopyable())
+
+        first_snapshot = self.tracker.get_snapshot(state)
+        second_snapshot = self.tracker.get_snapshot(state)
+
+        self.assertIsInstance(first_snapshot, str)
+        self.assertIsInstance(second_snapshot, str)
 
     def test_recursive_frames_keep_independent_states(self):
         tracker = VariableTracker("n")
