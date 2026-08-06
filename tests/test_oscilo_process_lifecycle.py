@@ -131,6 +131,104 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
         self.assertEqual(second_logs[-1]["event"], "updated")
         self.assertEqual(second_logs[-1]["data"], "after")
 
+    def test_register_on_unpicklable_value_does_not_crash_traced_program(self):
+        # Case 1 from oscilo issue #51: registering a value that cannot be
+        # deepcopy'd (threading.Lock) must not let TypeError from
+        # sys.settrace's callback escape into the traced program.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script = textwrap.dedent("""
+                import threading
+                import oscilo
+
+                def run():
+                    lock = threading.Lock()
+                    oscilo.register("lock")
+                    print("done")
+
+                run()
+            """)
+
+            logs = run_script_and_read_logs(self, script, temp_dir)
+
+        self.assertEqual(logs[0]["name"], "lock")
+        self.assertEqual(logs[0]["event"], "init")
+        self.assertEqual(logs[0]["data"], "<uncopyable>")
+
+    def test_register_on_value_whose_copy_is_itself_uncopyable_does_not_crash(self):
+        # The initial deepcopy in _make_state() succeeds here (__deepcopy__
+        # doesn't raise), but hands back a lock. The second deepcopy inside
+        # get_snapshot() then fails while building the log entry, which must
+        # not let TypeError escape the trace callback and abort the program.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script = textwrap.dedent("""
+                import threading
+                import oscilo
+
+                class CopyReturnsUncopyable:
+                    def __deepcopy__(self, memo):
+                        return threading.Lock()
+
+                def run():
+                    target = CopyReturnsUncopyable()
+                    oscilo.register("target")
+                    checkpoint = "program continued"
+                    print(checkpoint)
+
+                run()
+            """)
+
+            result = run_python_script(script, temp_dir)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("program continued", result.stdout)
+
+            log_file = os.path.join(temp_dir, DEFAULT_LOG_NAME)
+            self.assertTrue(os.path.exists(log_file))
+            logs = read_jsonl(log_file)
+
+        target_logs = [entry for entry in logs if entry["name"] == "target"]
+
+        self.assertEqual(target_logs[0]["event"], "init")
+        self.assertEqual(
+            target_logs[0]["data"],
+            "<uncopyable>",
+        )
+
+    def test_reassigning_tracked_value_to_unpicklable_value_keeps_running(self):
+        # Case 2 from oscilo issue #51: assigning an unpicklable value to an
+        # already-tracked variable used to raise TypeError from inside the
+        # trace callback, aborting the traced program before it finished.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script = textwrap.dedent("""
+                import threading
+                import oscilo
+
+                def run():
+                    data = [1, 2, 3]
+                    oscilo.register("data")
+                    data = threading.Lock()
+                    x = 42
+                    print("end", x)
+
+                run()
+            """)
+
+            result = run_python_script(script, temp_dir)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("end 42", result.stdout)
+
+            log_file = os.path.join(temp_dir, DEFAULT_LOG_NAME)
+            self.assertTrue(os.path.exists(log_file))
+            logs = read_jsonl(log_file)
+
+        data_logs = [entry for entry in logs if entry["name"] == "data"]
+
+        self.assertEqual(data_logs[0]["event"], "init")
+        self.assertEqual(data_logs[0]["data"], [1, 2, 3])
+        self.assertEqual(data_logs[-1]["event"], "updated")
+        self.assertEqual(data_logs[-1]["data"], "<uncopyable>")
+
     def test_process_log_uses_jsonl_schema_after_exit(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             script = textwrap.dedent("""
