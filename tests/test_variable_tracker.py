@@ -432,22 +432,22 @@ class TestVariableTrackerState(unittest.TestCase):
         self.assertFalse(atomic_state["copy_failed"])
         self.assertFalse(mutable_state["copy_failed"])
 
-    def test_get_snapshot_returns_json_serializable_value_for_copy_failure(self):
+    def test_get_snapshot_returns_stable_placeholder_for_copy_failure(self):
         value = threading.Lock()
         state = self.tracker._make_state(value)
 
         snapshot = self.tracker.get_snapshot(state)
 
-        self.assertEqual(snapshot, repr(value))
-        json.dumps(snapshot)  # Must not raise.
+        self.assertEqual(snapshot, "<uncopyable>")
+        json.dumps(snapshot)
 
-    def test_get_snapshot_falls_back_when_repr_raises(self):
+    def test_get_snapshot_does_not_call_repr_for_copy_failure(self):
         state = self.tracker._make_state(UnrepresentableValue())
 
         snapshot = self.tracker.get_snapshot(state)
 
-        self.assertEqual(snapshot, "<unrepresentable>")
-        json.dumps(snapshot)  # Must not raise.
+        self.assertEqual(snapshot, "<uncopyable>")
+        json.dumps(snapshot)
 
     def test_check_demotes_copy_failure_state_to_identity_only_comparison(self):
         target = threading.Lock()
@@ -511,7 +511,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
         snapshot = self.tracker.get_snapshot(state)
 
-        self.assertIsInstance(snapshot, str)
+        self.assertEqual(snapshot, "<uncopyable>")
         json.dumps(snapshot)  # Must not raise.
 
         self.assertIsNone(state["copy"])
@@ -523,8 +523,8 @@ class TestVariableTrackerState(unittest.TestCase):
         first_snapshot = self.tracker.get_snapshot(state)
         second_snapshot = self.tracker.get_snapshot(state)
 
-        self.assertIsInstance(first_snapshot, str)
-        self.assertIsInstance(second_snapshot, str)
+        self.assertEqual(first_snapshot, "<uncopyable>")
+        self.assertEqual(second_snapshot, "<uncopyable>")
 
     def test_recursive_frames_keep_independent_states(self):
         tracker = VariableTracker("n")

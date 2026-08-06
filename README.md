@@ -115,6 +115,7 @@ Notes:
 - `register()` returns `None`; registration is its only effect.
 - Importing `oscilo` has no side effects — tracing starts only when `register()` is called.
 - If no change is ever recorded, no file is written.
+- If a tracked value cannot be deep-copied, oscilo records `<uncopyable>` and tracks reassignment only. In-place mutations of the same object cannot be detected because no comparison snapshot is available.
 
 ## Output format
 

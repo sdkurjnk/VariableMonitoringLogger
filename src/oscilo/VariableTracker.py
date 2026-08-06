@@ -17,6 +17,7 @@ UPDATED_EVENT = "updated"
 DELETED_EVENT = "deleted"
 NOT_FOUND_EVENT = "not_found"
 NO_CHANGE_EVENT = "no_change"
+_SNAPSHOT_COPY_FAILED = "<uncopyable>"
 
 _FRAME_STATE_ATOMIC_TYPES = (
     int,
@@ -66,12 +67,6 @@ class VariableTracker:
 
         return None
 
-    def _safe_repr(self, value):
-        try:
-            return repr(value)
-        except Exception:
-            return "<unrepresentable>"
-
     def get_snapshot(self, state):
         if state is None:
             return None
@@ -81,7 +76,7 @@ class VariableTracker:
                 # The reference itself could not be deepcopy'd, so it is not
                 # safe to hand out raw (e.g. a lock reaching HistoryBuffer /
                 # json.dumps). Fall back to a JSON-serializable placeholder.
-                return self._safe_repr(state["ref"])
+                return _SNAPSHOT_COPY_FAILED
 
             return state["ref"]
 
@@ -100,7 +95,7 @@ class VariableTracker:
             # is observed by later check() calls on that state.
             state["copy"] = None
             state["copy_failed"] = True
-            return self._safe_repr(state["ref"])
+            return _SNAPSHOT_COPY_FAILED
 
     def check(
         self,

@@ -72,6 +72,8 @@ C 호출도 공짜가 아니므로 `VariableTracker.check`가 앞에서 한 번 
 
 이 두 번째 deepcopy도 실패할 수 있다 — `__deepcopy__`가 원본과 다른, 그 자체로 복사 불가능한 객체를 돌려주는 경우다. `_make_state`의 최초 deepcopy 실패와 동일하게 `copy`를 `None`으로, `copy_failed`를 `True`로 낮춰 이후 `check`가 참조 비교만으로 처리하도록 한다.
 
+스냅샷 복사에 실패한 값은 객체의 `repr()` 대신 `<uncopyable>`이라는 고정 문자열로 기록한다. 따라서 객체 주소처럼 실행마다 달라지는 정보가 로그에 포함되지 않는다.
+
 ## Python 3.13+ 대응
 
 3.13부터 `frame.f_locals`가 프록시로 노출될 수 있어 C 코드는 버전별로 조회를 나눈다.

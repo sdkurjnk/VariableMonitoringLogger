@@ -152,7 +152,7 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
 
         self.assertEqual(logs[0]["name"], "lock")
         self.assertEqual(logs[0]["event"], "init")
-        self.assertIsInstance(logs[0]["data"], str)
+        self.assertEqual(logs[0]["data"], "<uncopyable>")
 
     def test_register_on_value_whose_copy_is_itself_uncopyable_does_not_crash(self):
         # The initial deepcopy in _make_state() succeeds here (__deepcopy__
@@ -189,7 +189,10 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
         target_logs = [entry for entry in logs if entry["name"] == "target"]
 
         self.assertEqual(target_logs[0]["event"], "init")
-        self.assertIsInstance(target_logs[0]["data"], str)
+        self.assertEqual(
+            target_logs[0]["data"],
+            "<uncopyable>",
+        )
 
     def test_reassigning_tracked_value_to_unpicklable_value_keeps_running(self):
         # Case 2 from oscilo issue #51: assigning an unpicklable value to an
@@ -224,7 +227,7 @@ class TestVMlogProcessLifecycle(unittest.TestCase):
         self.assertEqual(data_logs[0]["event"], "init")
         self.assertEqual(data_logs[0]["data"], [1, 2, 3])
         self.assertEqual(data_logs[-1]["event"], "updated")
-        self.assertIsInstance(data_logs[-1]["data"], str)
+        self.assertEqual(data_logs[-1]["data"], "<uncopyable>")
 
     def test_process_log_uses_jsonl_schema_after_exit(self):
         with tempfile.TemporaryDirectory() as temp_dir:
