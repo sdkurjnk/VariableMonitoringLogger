@@ -17,6 +17,7 @@ UPDATED_EVENT = "updated"
 DELETED_EVENT = "deleted"
 NOT_FOUND_EVENT = "not_found"
 NO_CHANGE_EVENT = "no_change"
+_SNAPSHOT_COPY_FAILED = "<uncopyable>"
 
 _FRAME_STATE_ATOMIC_TYPES = (
     int,
@@ -39,13 +40,22 @@ class VariableTracker:
         # can be compared by identity alone. Containers need a detached snapshot
         # because they may hold mutable objects even when the container is immutable.
         snapshot = None
+        copy_failed = False
 
         if not isinstance(value, _FRAME_STATE_ATOMIC_TYPES):
-            snapshot = copy.deepcopy(value)
+            try:
+                snapshot = copy.deepcopy(value)
+            except Exception:
+                # Not everything is deepcopy-able (locks, sockets, file handles,
+                # or containers hiding one of those). Fall back to identity-only
+                # comparison instead of letting this escape the trace callback.
+                snapshot = None
+                copy_failed = True
 
         return {
             "ref": value,
             "copy": snapshot,
+            "copy_failed": copy_failed,
         }
 
     def _get_current_value(self, frame, domain, varName):
@@ -62,10 +72,30 @@ class VariableTracker:
             return None
 
         if state["copy"] is None:
+            if state["copy_failed"]:
+                # The reference itself could not be deepcopy'd, so it is not
+                # safe to hand out raw (e.g. a lock reaching HistoryBuffer /
+                # json.dumps). Fall back to a JSON-serializable placeholder.
+                return _SNAPSHOT_COPY_FAILED
+
             return state["ref"]
 
         # Do not expose the stored mutable snapshot directly to callers.
-        return copy.deepcopy(state["copy"])
+        try:
+            return copy.deepcopy(state["copy"])
+        except Exception:
+            # The initial deepcopy in _make_state() succeeded, but the copy it
+            # produced is itself uncopyable (e.g. __deepcopy__ hands back a
+            # lock). Demote state in place so future check() calls fall back
+            # to identity-only comparison instead of retrying this deepcopy
+            # and raising again on every subsequent line event. This is safe
+            # because get_snapshot() has exactly one production caller
+            # (TraceDispatcher._log_event), which always receives the same
+            # dict object already stored by _check_and_log, so the demotion
+            # is observed by later check() calls on that state.
+            state["copy"] = None
+            state["copy_failed"] = True
+            return _SNAPSHOT_COPY_FAILED
 
     def check(
         self,
@@ -96,8 +126,11 @@ class VariableTracker:
         previous_ref = prev_state["ref"]
         previous_copy = prev_state["copy"]
 
-        # Atomic values do not have a snapshot. Reference identity is enough
-        # because they cannot contain independently mutable state.
+        # previous_copy is None means either: the value is atomic (no snapshot
+        # was ever needed, safe to compare by identity), or a deepcopy failed
+        # and the state was demoted to identity-only comparison. In the
+        # demoted case the value may still be genuinely mutable, so an
+        # in-place mutation with no reassignment will not be detected here.
         if previous_copy is None:
             if current_value is previous_ref:
                 return NO_CHANGE_EVENT, prev_state
