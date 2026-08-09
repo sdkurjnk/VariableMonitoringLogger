@@ -1,4 +1,10 @@
-# oscilo
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"  srcset="https://raw.githubusercontent.com/sdkurjnk/oscilo/master/docs/assets/oscilo-banner-dark@2x.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/sdkurjnk/oscilo/master/docs/assets/oscilo-banner-light@2x.png">
+    <img src="https://raw.githubusercontent.com/sdkurjnk/oscilo/master/docs/assets/oscilo-banner-dark@2x.png" alt="oscilo" width="100%">
+  </picture>
+</p>
 
 Zero-invasive variable-change tracker for Python. Register a variable once and `oscilo` records every change it undergoes — without touching your code.
 
