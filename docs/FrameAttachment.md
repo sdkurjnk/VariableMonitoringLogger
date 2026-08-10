@@ -35,9 +35,17 @@ frame_state = self._ensure_frame_tracking(frame) #TrcerDispathcer.py - line 260
 
 추적 가능 기준은 스택상의 위치가 아니라 **`sys.settrace` 호출 시점 대비 프레임의 생성 시점**이다.
 
-수동 부착은 등록 프레임에서 끝나지 않는다. 등록 프레임의 지역 변수를 shadowing 없이 참조할 수 있는 조상 프레임(같은 code 객체를 재귀 중인 프레임, 또는 같은 globals dict를 쓰는 프레임)에서 일어나는 변경도 잡아야 하므로, `register()`는 `_ensure_active_ancestor_tracking(frame)`으로 `frame.f_back`을 거슬러 올라가며 각 조상에 대해 `_relevant_for()`로 관련 여부를 판정하고, 관련 있는 프레임에만 라인 트레이서를 붙인다.
+수동 부착은 등록 프레임에서 끝나지 않는다. 등록 프레임의 지역 변수를 shadowing 없이 참조할 수 있는 조상 프레임(같은 code 객체를 재귀 중인 프레임, 또는 같은 globals dict를 쓰는 프레임)에서 일어나는 변경도 잡아야 하므로, `register()`는 `_ensure_active_ancestor_tracking(frame, is_new_tracker)`으로 `frame.f_back`을 거슬러 올라가며 각 조상에 대해 `_relevant_for()`로 관련 여부를 판정하고, 관련 있는 프레임에만 라인 트레이서를 붙인다.
 
 이 탐색은 무한정 올라가지 않는다. `co_name == "<module>"`인 프레임을 만나면 그 프레임까지는 처리하고 즉시 멈춘다. `<module>` 프레임은 이 실행 단위(대상 파일, 하나의 `exec()` 호출, 하나의 Jupyter 셀)의 최상단이기 때문이다. 여기서 멈추지 않으면, 같은 globals dict를 재사용하는 무관한 실행 단위(중첩 `exec()`, 노트북 셀 러너)나 이 코드를 호출한 인터프리터/테스트 러너 프레임까지 관련 있다고 잘못 판정해 추적을 붙이게 된다.
+
+### 조상 탐색의 조기 종료
+
+`is_new_tracker`가 `False`인 호출(기존 tracker를 재사용하는 dedup 등록)은 이 탐색 도중 이미 `_frame_states`에 있는 조상을 만나면 그 지점에서 즉시 멈춘다. 그 조상은 이전 등록에서 이미 라인 트레이서가 붙었고, relevance는 캐싱되지 않고 매 line/return 이벤트마다 `_relevant_for()`로 새로 계산되므로, 프레임이 한 번 추적되기 시작하면 그 이후 어떤 tracker가 추가되든 다음 라인에서 자동으로 반영된다. 즉 그 위 체인은 이전 등록에서 이미 처리가 끝난 상태임이 보장된다.
+
+반대로 새 tracker가 생성되는 호출(`is_new_tracker=True`)은 이 조기 종료를 적용하지 않고 `<module>`까지 전체를 훑는다. 새 tracker의 등장은 `_frame_cache`를 무효화해 어떤 code 객체에 어떤 tracker가 관련 있는지 자체를 바꿀 수 있으므로, 이미 추적 중인 조상이라 해도 다시 판정해야 하기 때문이다.
+
+같은 code 객체가 재귀 매 depth마다 같은 변수를 등록하는 패턴(각 프레임이 직전 프레임을 이미 추적 중인 상태로 만나는 경우)에서, 이 조기 종료가 없으면 매 등록마다 조상 체인 전체를 다시 훑어 총비용이 재귀 깊이의 제곱에 가깝게 증가한다.
 
 ## 라인 트레이서를 프레임마다 새로 만드는 이유
 

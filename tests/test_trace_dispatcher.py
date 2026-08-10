@@ -505,5 +505,189 @@ class TestTraceDispatcherStopCleanup(unittest.TestCase):
         )
 
 
+class TestTraceDispatcherAncestorEarlyExit(unittest.TestCase):
+    """Covers the register() ancestor-walk early exit (issue #59): a dedup
+    registration (is_new_tracker=False) must stop climbing frame.f_back as
+    soon as it reaches a frame already present in _frame_states, instead of
+    re-walking ancestors an earlier registration already tracked. A new
+    tracker (is_new_tracker=True) must never take this shortcut, since it
+    can change relevance for the whole frame_cache.
+    """
+
+    def setUp(self):
+        self.buffer = HistoryBuffer()
+        self.dispatcher = TraceDispatcher(self.buffer)
+
+    def tearDown(self):
+        self.dispatcher.stop()
+
+    def _freeze_global_trace(self):
+        # Force _is_tracing True *before* any register() call so that
+        # register()'s internal _start_tracing() sees tracing as already
+        # active and skips re-installing sys.settrace. This keeps the
+        # global "call"-event hook (_trace_calls) off for the whole test,
+        # so the _relevant_for counts below reflect only calls made
+        # explicitly by the ancestor-walk/registration code path, not the
+        # incidental noise sys.settrace adds for every Python call while
+        # active. The dispatcher's own dict bookkeeping is unaffected by
+        # whether sys.settrace is actually installed.
+        self.dispatcher._is_tracing = True
+        sys.settrace(None)
+
+    def _count_relevant_for_calls(self):
+        counts = {}
+        original = self.dispatcher._relevant_for
+
+        def wrapper(frame):
+            counts[id(frame)] = counts.get(id(frame), 0) + 1
+            return original(frame)
+
+        self.dispatcher._relevant_for = wrapper
+        return counts
+
+    def test_dedup_registration_stops_before_checking_tracked_parent(self):
+        self._freeze_global_trace()
+        counts = self._count_relevant_for_calls()
+        depths_checked = []
+
+        def recurse(n):
+            acc = n
+            frame = sys._getframe()
+            self.dispatcher.register("acc", frame=frame)
+            if n < 5:
+                parent = frame.f_back
+                self.assertIn(parent, self.dispatcher._frame_states)
+                depths_checked.append(counts.get(id(parent), 0))
+            if n > 1:
+                recurse(n - 1)
+
+        recurse(5)
+
+        # Each dedup registration's immediate parent was already tracked by
+        # the parent's own register() call still on the stack, so the
+        # early-exit break must fire before _relevant_for is ever invoked
+        # on that parent.
+        self.assertEqual(depths_checked, [0, 0, 0, 0])
+
+    def test_global_dedup_registration_gets_ancestor_early_exit(self):
+        global MODULE_LEVEL_COUNTER
+        MODULE_LEVEL_COUNTER = {"value": 0}
+
+        self._freeze_global_trace()
+        counts = self._count_relevant_for_calls()
+        depths_checked = []
+
+        def recurse(n):
+            frame = sys._getframe()
+            self.dispatcher.register("MODULE_LEVEL_COUNTER", frame=frame)
+            if n < 4:
+                parent = frame.f_back
+                self.assertIn(parent, self.dispatcher._frame_states)
+                depths_checked.append(counts.get(id(parent), 0))
+            if n > 1:
+                recurse(n - 1)
+
+        recurse(4)
+
+        self.assertEqual(depths_checked, [0, 0, 0])
+
+    def test_interleaved_untracked_frame_is_checked_once_then_walk_stops(self):
+        self._freeze_global_trace()
+        counts = self._count_relevant_for_calls()
+
+        depth = 4
+        wrapper_frames = []
+        recurse_body_frames = []
+
+        def wrapper(k):
+            wrapper_frames.append(sys._getframe())
+            recurse_body(k)
+
+        def recurse_body(k):
+            acc = k
+            frame = sys._getframe()
+            recurse_body_frames.append(frame)
+            self.dispatcher.register("acc", frame=frame)
+            if k > 1:
+                wrapper(k - 1)
+
+        wrapper(depth)
+
+        # wrapper() declares no tracked variable and is a brand-new frame
+        # object on every call, so it can never already be in _frame_states;
+        # the ancestor walk must therefore evaluate its relevance exactly
+        # once (never skip it, or relevance would silently go unchecked).
+        for frame in wrapper_frames:
+            self.assertEqual(counts.get(id(frame), 0), 1)
+
+        # recurse_body() tracks its own frame before recursing further, so
+        # no deeper registration's ancestor walk should ever re-examine it.
+        for frame in recurse_body_frames:
+            self.assertIn(frame, self.dispatcher._frame_states)
+            self.assertEqual(counts.get(id(frame), 0), 0)
+
+    def test_new_tracker_mid_recursion_does_not_early_exit(self):
+        self._freeze_global_trace()
+        counts = self._count_relevant_for_calls()
+
+        def recurse(n):
+            a = n
+            frame = sys._getframe()
+            self.dispatcher.register("a", frame=frame)
+            if n == 2:
+                parent = frame.f_back
+                self.assertIn(parent, self.dispatcher._frame_states)
+
+                # "b" has never been registered anywhere, so this is a
+                # brand-new tracker (is_new_tracker=True). Even though the
+                # immediate parent is already tracked, the walk must still
+                # visit it -- new trackers never take the early-exit
+                # shortcut, since _frame_cache.clear() can change what is
+                # relevant for any frame.
+                self.dispatcher.register("b", frame=frame)
+                self.assertGreaterEqual(counts.get(id(parent), 0), 1)
+            if n > 1:
+                recurse(n - 1)
+
+        recurse(3)
+
+        b_trackers = [t for t in self.dispatcher._trackers if t.varName == "b"]
+        self.assertEqual(len(b_trackers), 1)
+
+    def test_unregister_then_reregister_forces_full_walk_again(self):
+        def outer():
+            other = 1
+            outer_frame = sys._getframe()
+            self.dispatcher.register("other", frame=outer_frame)
+
+            def inner():
+                x = 1
+                frame = sys._getframe()
+                tracker1 = self.dispatcher.register("x", frame=frame)
+                self.dispatcher.unregister(tracker1)
+
+                dedup_key = ("x", frame.f_code)
+                self.assertNotIn(dedup_key, self.dispatcher._registered_local)
+
+                self._freeze_global_trace()
+                counts = self._count_relevant_for_calls()
+
+                parent = frame.f_back
+                self.assertIn(parent, self.dispatcher._frame_states)
+
+                tracker2 = self.dispatcher.register("x", frame=frame)
+
+                self.assertIsNot(tracker1, tracker2)
+                # Re-registration after unregister creates a brand-new
+                # tracker (is_new_tracker=True), so the walk must still
+                # visit the already-tracked parent instead of
+                # short-circuiting.
+                self.assertGreaterEqual(counts.get(id(parent), 0), 1)
+
+            inner()
+
+        outer()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
