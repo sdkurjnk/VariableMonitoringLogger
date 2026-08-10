@@ -233,7 +233,9 @@ class TraceDispatcher:
             dedup_key = (varName, id(frame.f_globals))
             tracker = self._registered_global.get(dedup_key)
 
-        if tracker is None:
+        is_new_tracker = tracker is None
+
+        if is_new_tracker:
             tracker = VariableTracker(varName, domain=resolved_domain)
             self._trackers.append(tracker)
 
@@ -258,7 +260,7 @@ class TraceDispatcher:
         # line tracing을 여기서 명시적으로 붙여야 한다(또는 이전 등록/호출에서
         # 이미 붙어 있다면 그것을 재사용한다).
         frame_state = self._ensure_frame_tracking(frame)
-        self._ensure_active_ancestor_tracking(frame)
+        self._ensure_active_ancestor_tracking(frame, is_new_tracker)
 
         if self._is_enclosing_case(resolved_domain, tracker):
             self._check_and_log_enclosing(frame, tracker, varName)
@@ -493,10 +495,19 @@ class TraceDispatcher:
         frame.f_trace = self._make_line_tracer(frame_state)
         return frame_state
 
-    def _ensure_active_ancestor_tracking(self, frame):
+    def _ensure_active_ancestor_tracking(self, frame, is_new_tracker):
         current_frame = frame.f_back
 
         while current_frame is not None:
+            # dedup 등록(기존 tracker 재사용)일 때, 이미 _frame_states에 있는 조상을
+            # 만나면 그 지점에서 멈춘다. 그 조상은 이전 등록에서 이미 f_trace가
+            # 붙었고, 이후 라인마다 relevance를 새로 계산하므로(frame_cache가 그
+            # 사이 무효화되지 않는 한) 그 위 체인도 이미 처리된 것이 보장된다.
+            # 새 tracker가 생기는 경우는 relevance 후보 자체가 바뀔 수 있으므로
+            # 이 조기 종료를 적용하지 않는다.
+            if not is_new_tracker and current_frame in self._frame_states:
+                break
+
             local_relevant, global_relevant = self._relevant_for(
                 current_frame
             )
