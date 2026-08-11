@@ -442,7 +442,7 @@ class TraceDispatcher:
         local_relevant = [
             tracker for tracker in local_candidates
             if self._tracker_codes.get(tracker) is frame.f_code
-    ]
+        ]
 
         global_relevant = [
             tracker for tracker in global_candidates
