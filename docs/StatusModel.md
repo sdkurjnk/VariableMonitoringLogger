@@ -43,10 +43,10 @@ else:
 names = set(code.co_varnames) | set(code.co_cellvars) | set(code.co_freevars)
 local_candidates  = [t for t in self._trackers if t.varName in names]
 global_candidates = [t for t in self._trackers if t.varName not in names]
-entry = (local_candidates, global_candidates, frame.f_globals)
+entry = (local_candidates, global_candidates)
 ```
 
-**이름이 이 코드 객체의 지역 이름 집합에 속하는지**로 후보를 가른다. 정적 정보만 쓰므로 같은 함수의 모든 프레임에서 결과가 같아 `f_code`로 캐싱할 수 있다. 이게 없으면 호출마다 tracker 목록을 선형 탐색한다. 엔트리에 `frame.f_globals`를 함께 저장해, 같은 코드가 다른 globals에서 실행되는 경우(`exec`)를 감지하는 가드로 쓴다.
+**이름이 이 코드 객체의 지역 이름 집합에 속하는지**로 후보를 가른다. 이 분류는 코드 객체의 정적 정보만 사용하므로 같은 코드 객체의 모든 프레임에서 결과가 같고, `f_code`를 키로 안전하게 캐싱할 수 있다. 캐시에는 프레임마다 달라질 수 있는 `f_globals`를 저장하지 않는다. 실제 GLOBAL 스코프의 동일성은 2단계에서 현재 프레임을 기준으로 판정한다.
 
 ### 2단계 — `_tracker_codes` / `_tracker_globals` (identity 확정)
 
@@ -56,13 +56,11 @@ entry = (local_candidates, global_candidates, frame.f_globals)
 local_relevant = [t for t in local_candidates
                   if self._tracker_codes.get(t) is frame.f_code]
 
-global_relevant = []
-if global_candidates and frame.f_globals is entry_globals:
-    global_relevant = [t for t in global_candidates
-                       if self._tracker_globals.get(t) is frame.f_globals]
+global_relevant = [t for t in global_candidates
+                   if self._tracker_globals.get(t) is frame.f_globals]
 ```
 
-이름이 아니라 **객체 동일성**이라 동명 함수·모듈이 섞이지 않는다.
+이름이 아니라 **객체 동일성**을 검사하므로 동명 함수·모듈이 섞이지 않는다. 같은 코드 객체가 서로 다른 `globals`에서 실행되더라도 후보 캐시는 공유할 수 있지만, GLOBAL tracker는 현재 `frame.f_globals`와 등록 당시의 globals가 동일한 경우에만 선택된다.
 
 이 정보를 tracker가 아니라 dispatcher가 드는 이유는, tracker가 **등록 시점 스코프에만** 적용되도록 못 박기 위해서다. tracker에 붙이면 다른 프레임에서 재사용될 때 스코프 정보가 따라다니며 오염된다. 부수적으로 `unregister()`에서 중복 제거 키를 역산하는 데도 쓴다.
 

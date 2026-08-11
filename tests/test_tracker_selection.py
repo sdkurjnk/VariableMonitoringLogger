@@ -88,6 +88,32 @@ class TestTrackerSelectionCache(unittest.TestCase):
 
         self.assertIn(tracker, global_relevant)
 
+    def test_global_candidates_support_same_code_across_different_globals(self):
+        code = _code_with_locals()
+        globals_a = {"counter": 1}
+        globals_b = {"counter": 2}
+
+        tracker_a = self.dispatcher.register(
+            "counter",
+            frame=FakeFrame(code, globals_a),
+        )
+        tracker_b = self.dispatcher.register(
+            "counter",
+            frame=FakeFrame(code, globals_b),
+        )
+
+        # Force both frames to share one code-based cache entry.
+        self.dispatcher._frame_cache.clear()
+
+        frame_a = FakeFrame(code, globals_a)
+        frame_b = FakeFrame(code, globals_b)
+
+        _, relevant_a = self.dispatcher._relevant_for(frame_a)
+        _, relevant_b = self.dispatcher._relevant_for(frame_b)
+
+        self.assertEqual(relevant_a, [tracker_a])
+        self.assertEqual(relevant_b, [tracker_b])
+
     def test_irrelevant_frame_call_event_returns_none(self):
         code_a = _code_with_locals("target")
         frame_a = FakeFrame(code_a, {})
@@ -148,13 +174,12 @@ class TestTrackerSelectionCache(unittest.TestCase):
         local_tracker = self.dispatcher.register("local_name", frame=frame)
         global_tracker = self.dispatcher.register("global_name", frame=frame)
 
-        local_candidates, global_candidates, entry_globals = self.dispatcher._get_cache_entry(frame)
+        local_candidates, global_candidates = self.dispatcher._get_cache_entry(frame)
 
         self.assertIn(local_tracker, local_candidates)
         self.assertNotIn(local_tracker, global_candidates)
         self.assertIn(global_tracker, global_candidates)
         self.assertNotIn(global_tracker, local_candidates)
-        self.assertIs(entry_globals, globals_dict)
 
 
 if __name__ == "__main__":
