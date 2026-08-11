@@ -174,13 +174,12 @@ class TestTrackerSelectionCache(unittest.TestCase):
         local_tracker = self.dispatcher.register("local_name", frame=frame)
         global_tracker = self.dispatcher.register("global_name", frame=frame)
 
-        local_candidates, global_candidates, entry_globals = self.dispatcher._get_cache_entry(frame)
+        local_candidates, global_candidates = self.dispatcher._get_cache_entry(frame)
 
         self.assertIn(local_tracker, local_candidates)
         self.assertNotIn(local_tracker, global_candidates)
         self.assertIn(global_tracker, global_candidates)
         self.assertNotIn(global_tracker, local_candidates)
-        self.assertIs(entry_globals, globals_dict)
 
 
 if __name__ == "__main__":

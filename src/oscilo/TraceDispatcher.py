@@ -432,24 +432,22 @@ class TraceDispatcher:
         local_candidates = [tracker for tracker in self._trackers if tracker.varName in names]
         global_candidates = [tracker for tracker in self._trackers if tracker.varName not in names]
 
-        entry = (local_candidates, global_candidates, frame.f_globals)
+        entry = (local_candidates, global_candidates)
         self._frame_cache[code] = entry
         return entry
 
     def _relevant_for(self, frame):
-        local_candidates, global_candidates, entry_globals = self._get_cache_entry(frame)
+        local_candidates, global_candidates = self._get_cache_entry(frame)
 
         local_relevant = [
             tracker for tracker in local_candidates
             if self._tracker_codes.get(tracker) is frame.f_code
-        ]
+    ]
 
-        global_relevant = []
-        if global_candidates and frame.f_globals is entry_globals:
-            global_relevant = [
-                tracker for tracker in global_candidates
-                if self._tracker_globals.get(tracker) is frame.f_globals
-            ]
+        global_relevant = [
+            tracker for tracker in global_candidates
+            if self._tracker_globals.get(tracker) is frame.f_globals
+        ]
 
         return local_relevant, global_relevant
 
