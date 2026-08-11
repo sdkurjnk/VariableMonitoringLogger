@@ -1,4 +1,10 @@
-# oscilo
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"  srcset="https://raw.githubusercontent.com/sdkurjnk/oscilo/master/docs/assets/oscilo-banner-dark@2x.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/sdkurjnk/oscilo/master/docs/assets/oscilo-banner-light@2x.png">
+    <img src="https://raw.githubusercontent.com/sdkurjnk/oscilo/master/docs/assets/oscilo-banner-dark@2x.png" alt="oscilo" width="100%">
+  </picture>
+</p>
 
 Python 변수 변화를 코드 수정 없이 자동으로 추적하는 라이브러리. 변수 이름을 한 번만 등록하면 `oscilo`가 그 변수의 모든 변화를 기록합니다.
 
