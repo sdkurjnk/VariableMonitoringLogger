@@ -376,5 +376,161 @@ class TestVMLBehavior(unittest.TestCase):
             )
         )
 
+    def test_generator_completion_cleans_preserved_frame_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(
+                temp_dir,
+                "generator_completion.jsonl",
+            )
+            monitor = _Oscilo(filename)
+
+            def generate():
+                n = 0
+                monitor.register("n")
+                yield n
+
+                n = 1
+
+            generator = generate()
+            generator_frame = generator.gi_frame
+
+            try:
+                self.assertEqual(next(generator), 0)
+
+                with self.assertRaises(StopIteration):
+                    next(generator)
+
+                self.assertNotIn(
+                    generator_frame,
+                    monitor.dispatcher._context_manager._contexts,
+                )
+                self.assertNotIn(
+                    generator_frame,
+                    monitor.dispatcher._frame_states,
+                )
+                self.assertNotIn(
+                    generator_frame,
+                    monitor.dispatcher._frame_cell_cache,
+                )
+            finally:
+                monitor._finalSave()
+
+    def test_yield_from_keeps_single_call_context(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(
+                temp_dir,
+                "yield_from_context.jsonl",
+            )
+            monitor = _Oscilo(filename)
+
+            def delegated():
+                yield "first"
+                yield "second"
+
+            def generate():
+                n = 0
+                monitor.register("n")
+
+                yield from delegated()
+
+                n = 1
+                yield "done"
+
+            generator = generate()
+
+            self.assertEqual(next(generator), "first")
+            self.assertEqual(next(generator), "second")
+            self.assertEqual(next(generator), "done")
+
+            logs = finalize_and_read_logs(monitor, filename)
+
+        generator_logs = [
+            entry
+            for entry in logs
+            if entry["name"] == "n"
+        ]
+
+        self.assertEqual(
+            [
+                (entry["event"], entry["data"])
+                for entry in generator_logs
+            ],
+            [
+                ("init", 0),
+                ("updated", 1),
+            ],
+        )
+        self.assertEqual(
+            len(
+                {
+                    entry["call_id"]
+                    for entry in generator_logs
+                }
+            ),
+            1,
+        )
+
+    def test_coroutine_resume_keeps_single_call_context(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(
+                temp_dir,
+                "coroutine_context.jsonl",
+            )
+            monitor = _Oscilo(filename)
+
+            class SuspendOnce:
+                def __await__(self):
+                    yield "suspended"
+                    return None
+
+            async def run():
+                n = 0
+                monitor.register("n")
+
+                await SuspendOnce()
+
+                n = 1
+                return n
+
+            coroutine = run()
+
+            self.assertEqual(
+                coroutine.send(None),
+                "suspended",
+            )
+
+            with self.assertRaises(StopIteration) as completed:
+                coroutine.send(None)
+
+            self.assertEqual(completed.exception.value, 1)
+
+            logs = finalize_and_read_logs(monitor, filename)
+
+        coroutine_logs = [
+            entry
+            for entry in logs
+            if entry["name"] == "n"
+        ]
+
+        self.assertEqual(
+            [
+                (entry["event"], entry["data"])
+                for entry in coroutine_logs
+            ],
+            [
+                ("init", 0),
+                ("updated", 1),
+            ],
+        )
+        self.assertEqual(
+            len(
+                {
+                    entry["call_id"]
+                    for entry in coroutine_logs
+                }
+            ),
+            1,
+        )
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
