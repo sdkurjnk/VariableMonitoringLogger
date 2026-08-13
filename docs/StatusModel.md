@@ -117,7 +117,7 @@ line 이벤트 → trace_lines(frame_state 캡처)
 ```
 
 **정리**
-- **프레임 반환** — `_frame_states`·`_frame_cell_cache`에서 해당 프레임만 제거. 프레임 키 자료구조라 이 정리가 빠지면 누수.
+- **프레임 실제 종료** — suspend가 아닌 실제 종료에서 `_frame_states`·`_frame_cell_cache`의 해당 프레임만 제거한다. 제너레이터와 코루틴의 suspend에서는 resume 이후 같은 비교 기준을 사용해야 하므로 상태를 유지한다.
 - **`unregister(tracker)`** — 그 tracker가 소유한 것만 걷어낸다. `_tracker_codes`/`_tracker_globals`에서 스코프를 꺼내 중복 제거 키를 역산하고, `_tracker_cells`의 셀 목록으로 ENCLOSING 저장소를 정리한다. 셀 목록이 없으면 어느 셀이 어느 tracker 것인지 알 수 없어 남의 상태까지 지운다.
 - **`_stop_tracing()`** — `sys.settrace(None)` 이후엔 어떤 상태도 무효하므로 전부 `clear()`.
 
@@ -138,7 +138,7 @@ line 이벤트 → trace_lines(frame_state 캡처)
 | `_enclosing_states` | `id(cell)` | `unregister` / `stop` |
 | `_enclosing_var_ids` | `id(cell)` | `unregister` / `stop` |
 | `_enclosing_cell_refs` | `id(cell)` | `unregister` / `stop` |
-| `_frame_states` | frame | 해당 프레임 `return` / `stop` |
-| `_frame_cell_cache` | frame | 해당 프레임 `return` / `stop` |
+| `_frame_states` | frame | 해당 프레임의 실제 종료 / `stop` |
+| `_frame_cell_cache` | frame | 해당 프레임의 실제 종료 / `stop` |
 
 프레임을 키로 쓰는 둘만 프레임 수명을 따르고 나머지는 tracker 수명을 따른다. ENCLOSING 저장소가 프레임이 아니라 셀에 묶인 이유는 [스코프 해석](./ScopeResolution.md)을 참고.

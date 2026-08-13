@@ -1,7 +1,10 @@
+import sys
 import unittest
 
-from oscilo.CallContext import CallContextManager
-
+from oscilo.CallContext import (
+    CallContextManager,
+    is_suspended_return,
+)
 
 class FakeFrame:
     def __init__(self, name, f_back=None):
@@ -236,6 +239,28 @@ class TestCallContextManager(unittest.TestCase):
         self.manager.on_return(None)
 
         self.assertEqual(self.manager._contexts, {})
+
+    def test_suspended_generator_return_is_detected(self):
+        def generate():
+            yield "paused"
+
+        generator = generate()
+
+        try:
+            self.assertEqual(next(generator), "paused")
+            self.assertTrue(
+                is_suspended_return(generator.gi_frame)
+            )
+        finally:
+            generator.close()
+
+    def test_completed_frame_is_not_reported_as_suspended(self):
+        def capture_frame():
+            return sys._getframe()
+
+        frame = capture_frame()
+
+        self.assertFalse(is_suspended_return(frame))
 
 
 if __name__ == "__main__":

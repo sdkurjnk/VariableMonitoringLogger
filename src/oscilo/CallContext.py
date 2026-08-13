@@ -1,3 +1,31 @@
+import dis
+
+
+_YIELD_VALUE_OPCODE = dis.opmap["YIELD_VALUE"]
+
+
+def is_suspended_return(frame):
+    if frame is None:
+        return False
+
+    instruction_offset = getattr(frame, "f_lasti", -1)
+    code = getattr(frame, "f_code", None)
+    bytecode = getattr(code, "co_code", b"")
+
+    # Python 3.11/3.12 may report f_lasti at YIELD_VALUE, while
+    # Python 3.13 reports the following RESUME instruction.
+    candidate_offsets = (
+        instruction_offset,
+        instruction_offset - 2,
+    )
+
+    return any(
+        0 <= offset < len(bytecode)
+        and bytecode[offset] == _YIELD_VALUE_OPCODE
+        for offset in candidate_offsets
+    )
+
+
 class CallContextManager:
     def __init__(self):
         self._next_call_id = 1
@@ -60,7 +88,7 @@ class CallContextManager:
         return self._contexts[frame]
 
     def on_return(self, frame):
-        if frame is None:
+        if frame is None or is_suspended_return(frame):
             return
 
         self._contexts.pop(frame, None)
@@ -110,6 +138,9 @@ class CallContextManager:
 
         def cleanup_trace(current_frame, event, arg):
             if event == "return":
+                if is_suspended_return(current_frame):
+                    return cleanup_trace
+
                 self.on_return(current_frame)
                 return None
 
