@@ -55,10 +55,14 @@ frame_state = self._ensure_frame_tracking(frame) #TrcerDispathcer.py - line 260
 
 ## 정리 시점
 
-로컬 트레이서는 매번 자기 자신을 반환해 다음 라인에서도 호출되고, `return` 이벤트에서 `None`을 반환해 스스로를 떼어낸다.
+로컬 트레이서는 매번 자기 자신을 반환해 다음 이벤트에서도 호출된다. 일반 프레임이 실제로 종료되면 `_frame_states`와 `_frame_cell_cache`에서 해당 프레임 항목을 제거하고 `None`을 반환해 트레이서를 떼어낸다. 프레임을 키로 사용하는 자료구조이므로 실제 종료 시 정리가 빠지면 상태가 프레임보다 오래 살아남아 누수가 발생한다.
 
-이때 `_frame_states`와 `_frame_cell_cache`에서 해당 프레임 항목을 제거한다. 프레임을 키로 쓰는 자료구조이므로, 이 정리가 빠지면 상태가 프레임보다 오래 살아남아 누수가 된다.
+다만 CPython은 제너레이터와 코루틴이 suspend될 때도 `return` 이벤트를 발생시킨다. `is_suspended_return()`이 이를 suspend로 판정하면 트레이서를 그대로 반환하고, `_frame_states`, `_frame_cell_cache`, 호출 컨텍스트를 모두 유지한다. 실제 종료로 판정된 경우에만 기존 정리 절차를 수행한다.
 
 ## 제너레이터와 코루틴
 
-suspend된 제너레이터 프레임은 스택에 없어 `f_back` 체인에 존재하지 않는다. 다만 CPython은 resume될 때마다 "call" 이벤트를 다시 내므로 자동 경로로 처리된다. 부작용으로 resume마다 호출 컨텍스트가 재생성된다(→ [호출 컨텍스트 트리](./CallContext.md)).
+suspend된 제너레이터와 코루틴 프레임은 실행 스택에 없으므로 `f_back` 체인에도 나타나지 않는다. 다만 CPython은 resume될 때마다 `"call"` 이벤트를 다시 발생시키므로 자동 부착 경로가 동일한 프레임을 다시 확인한다.
+
+suspend 시 기존 `_frame_states`와 프레임 전용 트레이서를 유지하므로 resume 이후에도 동일한 변경 감지 기준을 사용한다. 호출 컨텍스트 역시 제거하지 않기 때문에 일반 제너레이터, `yield from`, coroutine처럼 실행이 여러 슬라이스로 나뉘는 경우에도 하나의 논리적 호출이 동일한 `call_id`를 유지한다.
+
+실제 종료 시점에는 일반 프레임과 마찬가지로 프레임 상태와 호출 컨텍스트를 제거한다. 자세한 identity 정책은 [호출 컨텍스트 트리](./CallContext.md)를 참고한다.
