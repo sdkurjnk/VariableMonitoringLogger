@@ -301,5 +301,80 @@ class TestVMLBehavior(unittest.TestCase):
         self.assertNotEqual(left_child_call_id, right_child_call_id)
         self.assertEqual([entry["call_depth"] for entry in init_logs], [1, 2, 3, 3, 2])
 
+    def test_generator_resume_keeps_single_call_context(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filename = os.path.join(
+                temp_dir,
+                "generator_context.jsonl",
+            )
+            monitor = _Oscilo(filename)
+
+            def generate():
+                n = 0
+                monitor.register("n")
+                yield n
+
+                n = 1
+                yield n
+
+                n = 2
+                yield n
+
+            generator = generate()
+
+            self.assertEqual(next(generator), 0)
+
+            def resume_a():
+                return next(generator)
+
+            def resume_b():
+                return next(generator)
+
+            self.assertEqual(resume_a(), 1)
+            self.assertEqual(resume_b(), 2)
+
+            logs = finalize_and_read_logs(monitor, filename)
+
+        generator_logs = [
+            entry
+            for entry in logs
+            if entry["name"] == "n"
+        ]
+
+        self.assertEqual(
+            [
+                (entry["event"], entry["data"])
+                for entry in generator_logs
+            ],
+            [
+                ("init", 0),
+                ("updated", 1),
+                ("updated", 2),
+            ],
+        )
+
+        first_context = generator_logs[0]
+
+        self.assertTrue(
+            all(
+                entry["call_id"] == first_context["call_id"]
+                for entry in generator_logs
+            )
+        )
+        self.assertTrue(
+            all(
+                entry["parent_call_id"]
+                == first_context["parent_call_id"]
+                for entry in generator_logs
+            )
+        )
+
+        self.assertTrue(
+            all(
+                entry["call_depth"] == first_context["call_depth"]
+                for entry in generator_logs
+            )
+        )
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
