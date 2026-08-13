@@ -42,13 +42,19 @@
 
 ## gap 프레임 전용 정리 트레이서
 
-컨텍스트를 만든 프레임은 반환 시 지워야 `_contexts`가 무한히 자라지 않는다. 관련 프레임은 자기 트레이서의 `return` 경로에서 `on_return()`을 부르지만, gap을 메우려 자동 생성한 프레임에는 트레이서가 없다. 그래서 `_attach_return_cleanup()`이 정리 전용 트레이서를 붙인다.
+컨텍스트를 만든 프레임은 실제 종료 시 지워야 `_contexts`가 무한히 자라지 않는다. 관련 프레임은 자기 트레이서의 `return` 경로에서 `on_return()`을 부르지만, gap을 메우려고 자동 생성한 프레임에는 트레이서가 없다. 그래서 `_attach_return_cleanup()`이 정리 전용 트레이서를 붙인다.
 
-- **기존 트레이서를 덮어쓰지 않는다.** `f_trace`가 이미 있으면 관련 프레임으로 보고 손대지 않는다 — 덮어쓰면 그 프레임의 변수 추적이 죽는다.
-- **라인 이벤트를 끈다.** `f_trace_lines = False`로 `return`만 받는다. gap 프레임은 변수를 볼 필요가 없다.
+- **기존 트레이서를 덮어쓰지 않는다.** `f_trace`가 이미 있으면 관련 프레임으로 보고 손대지 않는다. 기존 트레이서를 덮어쓰면 해당 프레임의 변수 추적이 중단된다.
+- **라인 이벤트를 끈다.** `f_trace_lines = False`로 설정해 return 계열 이벤트만 받는다. 제너레이터나 코루틴의 suspend로 발생한 `return` 이벤트에서는 cleanup tracer를 유지하고, 실제 종료에서만 컨텍스트를 정리한다.
 
 정리 시 `_restore_cleanup_trace()`가 원래 값을 되돌리되, 그 사이 다른 주체가 트레이서를 교체했을 수 있으므로 현재 `f_trace`가 자신이 설치한 것인지 확인한다.
 
-## 알려진 문제: 제너레이터 resume
+## 제너레이터와 코루틴의 suspend
 
-CPython은 제너레이터가 resume될 때마다 "call" 이벤트를 재발생시킨다. 그 결과 **같은 프레임이 resume마다 새 `call_id`를 받아** 논리적으로 하나인 호출이 여러 개로 쪼개진다. 프레임을 키로 컨텍스트를 관리하는 구조와 CPython 이벤트 모델이 어긋나는 지점이다.
+CPython의 `sys.settrace`는 제너레이터와 코루틴이 suspend될 때도 `"return"` 이벤트를 발생시키고, resume될 때마다 `"call"` 이벤트를 다시 발생시킨다. 따라서 이벤트 이름만 검사하면 suspend를 실제 종료로 오인해 호출 컨텍스트와 프레임 상태를 제거하게 된다.
+
+`is_suspended_return(frame)`은 `frame.f_lasti` 주변의 bytecode가 `YIELD_VALUE`인지 확인해 suspend와 실제 종료를 구분한다. Python 버전에 따라 `f_lasti`가 `YIELD_VALUE` 자체를 가리키거나 바로 다음 `RESUME`을 가리킬 수 있으므로 현재 instruction과 직전 instruction을 함께 검사한다.
+
+suspend로 판정되면 기존 컨텍스트를 유지한다. 이후 같은 프레임이 resume되면 `ensure_context()`가 기존 컨텍스트를 재사용하므로, 논리적인 제너레이터 또는 코루틴 호출 하나는 하나의 `call_id`를 유지한다. `parent_call_id`와 `call_depth`도 최초 컨텍스트가 생성된 시점의 값을 유지한다.
+
+이 방식은 변수 타임라인과 프레임 identity를 일치시키는 대신, 각 실행 슬라이스를 재개한 호출자는 별도로 기록하지 않는다. 제너레이터 또는 코루틴이 실제로 종료되면 컨텍스트를 제거하고, `stop()`이 호출되면 suspend 상태로 남아 있는 컨텍스트도 모두 정리한다.

@@ -1,6 +1,6 @@
 import sys
 
-from .CallContext import CallContextManager
+from .CallContext import CallContextManager, is_suspended_return
 from .ScopeResolver import ScopeResolver
 from .VariableTracker import VariableTracker
 
@@ -474,6 +474,9 @@ class TraceDispatcher:
             self._process_frame(current_frame, frame_state)
 
             if current_event == "return":
+                if is_suspended_return(current_frame):
+                    return trace_lines
+
                 self._context_manager.on_return(current_frame)
                 self._frame_states.pop(current_frame, None)
                 self._frame_cell_cache.pop(current_frame, None)
