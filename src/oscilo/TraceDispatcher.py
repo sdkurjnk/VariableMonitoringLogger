@@ -200,6 +200,16 @@ class TraceDispatcher:
 
         self._tracker_cells.setdefault(tracker, set()).add(cell_key)
 
+    def _guarded_check_and_log(self, fn, *args, **kwargs):
+        # 추적 대상 값의 __eq__/__ne__(네이티브 비교 엔진 내부에서 호출됨)나
+        # check-and-log 도중의 다른 내부 실패가 관찰 대상 프로그램으로 절대
+        # 전파되면 안 된다. 전파되려 하면 그 tracker/이벤트 하나로만 격리해서
+        # 다른 tracker와 이후 이벤트는 계속 정상 동작하게 한다. 이슈 #52 참고.
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            return None
+
     def _check_and_log_enclosing(self, frame, tracker, varName):
         cell_key = self._resolve_cell_key_cached(frame, varName)
         self._record_tracker_cell(tracker, cell_key)
@@ -263,11 +273,15 @@ class TraceDispatcher:
         self._ensure_active_ancestor_tracking(frame, is_new_tracker)
 
         if self._is_enclosing_case(resolved_domain, tracker):
-            self._check_and_log_enclosing(frame, tracker, varName)
+            self._guarded_check_and_log(self._check_and_log_enclosing, frame, tracker, varName)
         elif is_local:
-            self._check_and_log(frame, tracker, frame_state, varName, resolved_domain)
+            self._guarded_check_and_log(
+                self._check_and_log, frame, tracker, frame_state, varName, resolved_domain
+            )
         else:
-            self._check_and_log(frame, tracker, self._global_states, tracker, resolved_domain)
+            self._guarded_check_and_log(
+                self._check_and_log, frame, tracker, self._global_states, tracker, resolved_domain
+            )
 
         return tracker
 
@@ -458,13 +472,19 @@ class TraceDispatcher:
             domain, _ = self._resolver.resolve(frame, tracker.varName)
 
             if self._is_enclosing_case(domain, tracker):
-                self._check_and_log_enclosing(frame, tracker, tracker.varName)
+                self._guarded_check_and_log(
+                    self._check_and_log_enclosing, frame, tracker, tracker.varName
+                )
             else:
-                self._check_and_log(frame, tracker, frame_state, tracker.varName, domain)
+                self._guarded_check_and_log(
+                    self._check_and_log, frame, tracker, frame_state, tracker.varName, domain
+                )
 
         for tracker in global_relevant:
             domain, _ = self._resolver.resolve(frame, tracker.varName)
-            self._check_and_log(frame, tracker, self._global_states, tracker, domain)
+            self._guarded_check_and_log(
+                self._check_and_log, frame, tracker, self._global_states, tracker, domain
+            )
 
     def _make_line_tracer(self, frame_state):
         def trace_lines(current_frame, current_event, current_arg):
