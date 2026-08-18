@@ -14,18 +14,18 @@ class _Oscilo:
         self.fileWriter = FileWriter()
         self._saved = False
 
-        # Register a final save so logs are written even without manual cleanup.
+        # 수동 정리 없이도 종료 시 저장되도록 등록.
         atexit.register(self.finalSave)
 
     def register(self, varName, frame=None):
-        # Pass the caller's frame so the dispatcher can resolve the variable.
+        # dispatcher가 변수를 해석하도록 호출자 frame을 넘긴다.
         if frame is None:
             frame = sys._getframe(1)
 
         self.dispatcher.register(varName, frame=frame)
 
     def finalSave(self):
-        # Keep this method idempotent because it may be called manually and by atexit.
+        # 수동 호출과 atexit 양쪽에서 불릴 수 있어 멱등하게 유지한다.
         if self._saved:
             return
 
@@ -34,13 +34,13 @@ class _Oscilo:
         self._saved = True
 
     def _stop_tracking(self):
-        # Stop tracing before writing so no further events are recorded during save.
+        # 저장 중 추가 이벤트가 안 남도록 먼저 트레이싱을 멈춘다.
         self.dispatcher.stop()
 
     def _write_history(self):
         history = self.buffer.getHistory()
 
-        # Skip the write entirely so runs without recorded events leave no file behind.
+        # 기록이 없으면 파일을 만들지 않는다.
         if not history:
             return
 

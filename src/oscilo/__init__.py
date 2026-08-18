@@ -2,7 +2,7 @@ import sys
 import threading
 from importlib.metadata import PackageNotFoundError, version
 
-from . import oscilo_engine  # Import eagerly so a missing C extension fails at import time.
+from . import oscilo_engine  # C 확장이 없으면 import 시점에 바로 실패하도록 즉시 import.
 from ._core import _Oscilo
 
 try:
@@ -12,8 +12,8 @@ except PackageNotFoundError:
 
 __all__ = ["register"]
 
-# The package owns exactly one monitor instance; it is created lazily on first
-# use so that importing ocilo alone has no side effects (no tracing, no atexit hook).
+# monitor 인스턴스는 하나만 두고 첫 사용 때 지연 생성한다. import만으로는
+# 부작용(트레이싱·atexit 훅)이 없게 하려는 것.
 _instance = None
 _instance_lock = threading.Lock()
 
@@ -22,11 +22,10 @@ def register(varName):
     global _instance
 
     if _instance is None:
-        # Double-checked locking so concurrent first calls cannot create two
-        # instances, which would reintroduce the multi-instance bug (issue #29).
+        # 동시 첫 호출이 인스턴스를 둘 만들지 않도록 double-checked locking. (이슈 #29)
         with _instance_lock:
             if _instance is None:
                 _instance = _Oscilo()
 
-    # Pass the caller's frame explicitly because the instance sits one call deeper.
+    # 인스턴스가 한 단계 더 깊이 있으므로 호출자 frame을 명시적으로 넘긴다.
     _instance.register(varName, sys._getframe(1))

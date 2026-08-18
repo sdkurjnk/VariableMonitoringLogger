@@ -9,7 +9,7 @@ typedef enum {
 
 static PyObject *get_scope_dict(PyObject *frame, ScopeType domain)
 {
-    // Select the dictionary that should be inspected for the requested scope.
+    // 요청된 scope에 해당하는 dict를 고른다.
     if (domain == LOCAL || domain == ENCLOSING) {
         return PyFrame_GetLocals((PyFrameObject *)frame);
     }
@@ -24,13 +24,13 @@ static PyObject *get_reference_from_scope(PyObject *scope_dict, PyObject *key)
     PyObject *reference = NULL;
 
 #if PY_VERSION_HEX >= 0x030D0000
-    // Python 3.13+ may expose frame locals through a proxy, so use GetItem.
+    // Python 3.13+는 frame locals를 proxy로 노출할 수 있어 GetItem을 쓴다.
     reference = PyObject_GetItem(scope_dict, key);
     if (reference == NULL) {
         PyErr_Clear();
     }
 #else
-    // PyDict_GetItem returns a borrowed reference, so incref before returning.
+    // PyDict_GetItem은 borrowed 참조를 반환하므로 반환 전에 incref.
     reference = PyDict_GetItem(scope_dict, key);
     Py_XINCREF(reference);
 #endif
@@ -49,7 +49,7 @@ static int is_immutable_value(PyObject *value)
 
 static int has_different_size(PyObject *current_value, PyObject *previous_snapshot)
 {
-    // Fast-path: size changes prove container mutation without full comparison.
+    // 빠른 경로: 크기 변화만으로 전체 비교 없이 컨테이너 변경을 확정.
     if (PyList_Check(current_value)) {
         return PyList_GET_SIZE(current_value) != PyList_GET_SIZE(previous_snapshot);
     }
@@ -112,7 +112,7 @@ static PyObject *oscilo_check_variable(PyObject *self, PyObject *args)
         Py_RETURN_TRUE;
     }
 
-    // Immutable values cannot change in place when the reference is unchanged.
+    // 참조가 그대로면 불변 값은 제자리 변경이 불가능하다.
     if (is_immutable_value(reference_curr)) {
         Py_DECREF(reference_curr);
         Py_RETURN_FALSE;

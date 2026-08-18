@@ -34,15 +34,13 @@ class VariableTracker:
     def __init__(self, varName, domain=None):
         self.varName = varName
         self.domain = domain
-        # The tracker owns its comparison state, keyed per scope instance.
-        # LOCAL uses the frame as the key so recursion keeps independent
-        # timelines. GLOBAL/ENCLOSING still route through the dispatcher for now.
+        # 트래커가 자기 비교 상태를 스코프 인스턴스별로 소유한다.
+        # key는 LOCAL=frame(재귀별 독립 timeline), ENCLOSING=id(cell)/frame, GLOBAL=고정 key.
         self._states = {}
 
     def _make_state(self, value):
-        # Frame state always keeps the current live reference. Only atomic values
-        # can be compared by identity alone. Containers need a detached snapshot
-        # because they may hold mutable objects even when the container is immutable.
+        # atomic 값은 identity만으로 비교 가능하지만,
+        # 컨테이너는 불변이어도 내부에 가변 객체를 담을 수 있어 분리된 스냅샷이 필요하다.
         snapshot = None
         copy_failed = False
 
@@ -50,9 +48,8 @@ class VariableTracker:
             try:
                 snapshot = copy.deepcopy(value)
             except Exception:
-                # Not everything is deepcopy-able (locks, sockets, file handles,
-                # or containers hiding one of those). Fall back to identity-only
-                # comparison instead of letting this escape the trace callback.
+                # 전부 deepcopy 되진 않는다(lock·socket·file handle 등).
+                # 트레이스 콜백 밖으로 예외를 흘리지 말고 identity-only 비교로 폴백한다.
                 snapshot = None
                 copy_failed = True
 
@@ -77,39 +74,35 @@ class VariableTracker:
 
         if state["copy"] is None:
             if state["copy_failed"]:
-                # The reference itself could not be deepcopy'd, so it is not
-                # safe to hand out raw (e.g. a lock reaching HistoryBuffer /
-                # json.dumps). Fall back to a JSON-serializable placeholder.
+                # 참조 자체를 복사 못 했으니 raw로 넘기면 위험하다(lock이 HistoryBuffer/json.dumps로).
+                # JSON 직렬화 가능한 placeholder로 폴백.
                 return _SNAPSHOT_COPY_FAILED
 
             return state["ref"]
 
-        # Do not expose the stored mutable snapshot directly to callers.
+        # 저장된 가변 스냅샷을 호출자에게 직접 노출하지 않는다.
         try:
             return copy.deepcopy(state["copy"])
         except Exception:
-            # The initial deepcopy in _make_state() succeeded, but the copy it
-            # produced is itself uncopyable (e.g. __deepcopy__ hands back a
-            # lock). Demote state in place so future check() calls fall back
-            # to identity-only comparison instead of retrying this deepcopy
-            # and raising again on every subsequent line event. This is safe
-            # because get_snapshot() has exactly one production caller
-            # (TraceDispatcher._log_event), which always receives the same
-            # dict object already stored in self._states by check_owned, so the
-            # demotion is observed by later check_owned() calls on that state.
+            # _make_state의 deepcopy는 성공했지만, 그 사본이 다시 복사 불가한
+            # 경우다(예: __deepcopy__가 lock 반환).
+            # 이후 line 이벤트마다 재시도·예외가 나지 않도록,
+            # state를 그 자리에서 identity-only로 강등한다.
+            # get_snapshot의 유일한 프로덕션 호출자(_log_event)는
+            # check_owned가 self._states에 저장한 같은 dict를 받으므로,
+            # 강등이 이후 check_owned 호출에 반영된다.
             state["copy"] = None
             state["copy_failed"] = True
             return _SNAPSHOT_COPY_FAILED
 
     def check(self, frame, domain, varName=None, prev_state=None):
-        # Stateless evaluation against an explicitly supplied prev_state. The
-        # dispatcher now drives all tracking through check_owned (which owns and
-        # stores state); this remains a pure helper for one-off checks and tests.
+        # 넘겨준 prev_state로 하는 무상태 평가.
+        # dispatcher는 이제 상태를 소유·저장하는 check_owned로 추적하고, 이 메서드는 일회성 검사·테스트용 순수 헬퍼로 남는다.
         return self._evaluate(frame, domain, varName, prev_state)
 
     def check_owned(self, frame, domain, key):
-        # The dispatcher only says "check this scope instance"; the tracker looks
-        # up and stores its own state under `key` (the frame for LOCAL).
+        # dispatcher는 "이 인스턴스 검사해"만 한다.
+        # 트래커가 key(LOCAL이면 frame)로 자기 상태를 조회·저장한다.
         prev_state = self._states.get(key)
         event_name, new_state = self._evaluate(frame, domain, self.varName, prev_state)
 
@@ -121,7 +114,7 @@ class VariableTracker:
         return event_name, new_state
 
     def forget(self, key):
-        # Drop the state for one scope instance (e.g. a returning frame).
+        # 한 스코프 인스턴스(예: return하는 frame)의 상태를 버린다.
         self._states.pop(key, None)
 
     def reset(self):
@@ -156,11 +149,8 @@ class VariableTracker:
         previous_ref = prev_state["ref"]
         previous_copy = prev_state["copy"]
 
-        # previous_copy is None means either: the value is atomic (no snapshot
-        # was ever needed, safe to compare by identity), or a deepcopy failed
-        # and the state was demoted to identity-only comparison. In the
-        # demoted case the value may still be genuinely mutable, so an
-        # in-place mutation with no reassignment will not be detected here.
+        # previous_copy가 None인 경우: atomic이라 스냅샷이 필요 없었거나 (identity 비교 안전), deepcopy 실패로 identity-only로 강등된 경우.
+        # 후자는 값이 실제로 가변일 수 있어, 재할당 없는 제자리 변경은 못 잡는다.
         if previous_copy is None:
             if current_value is previous_ref:
                 return NO_CHANGE_EVENT, prev_state
