@@ -151,14 +151,14 @@ class TestTraceDispatcherEnclosingIdentity(unittest.TestCase):
 
         self.assertIn(tracker, self.dispatcher._tracker_cells)
         self.assertTrue(self.dispatcher._enclosing_var_ids)
-        self.assertTrue(self.dispatcher._enclosing_states)
+        self.assertTrue(tracker._states)
         self.assertTrue(self.dispatcher._enclosing_cell_refs)
 
         self.dispatcher.unregister(tracker)
 
         self.assertNotIn(tracker, self.dispatcher._tracker_cells)
         self.assertEqual(self.dispatcher._enclosing_var_ids, {})
-        self.assertEqual(self.dispatcher._enclosing_states, {})
+        self.assertEqual(tracker._states, {})
         self.assertEqual(self.dispatcher._enclosing_cell_refs, {})
 
     def test_stop_clears_all_enclosing_state(self):
@@ -177,7 +177,6 @@ class TestTraceDispatcherEnclosingIdentity(unittest.TestCase):
         self.dispatcher.stop()
 
         self.assertEqual(self.dispatcher._enclosing_var_ids, {})
-        self.assertEqual(self.dispatcher._enclosing_states, {})
         self.assertEqual(self.dispatcher._enclosing_cell_refs, {})
         self.assertEqual(self.dispatcher._frame_cell_cache, {})
         self.assertEqual(self.dispatcher._tracker_cells, {})
@@ -206,7 +205,7 @@ class TestTraceDispatcherEnclosingIdentity(unittest.TestCase):
 class TestTraceDispatcherEnclosingAncestorEarlyExit(unittest.TestCase):
     """Covers issue #59's register() ancestor-walk early exit specifically
     for the ENCLOSING domain: closures resolve identity via
-    _enclosing_states/id(cell), not _frame_states, so the early-exit
+    tracker._states/id(cell), not _frame_states, so the early-exit
     condition (keyed off _frame_states) must have no effect on that
     cell-based bookkeeping while still short-circuiting the frame walk
     itself for recursive dedup registrations.

@@ -2,7 +2,7 @@
 
 변수 이름 하나가 어느 스코프에 속하는지 판정하는 방식과, ENCLOSING을 다루기 위한 타협을 정리한다.
 
-관련 코드: `ScopeResolver.resolve`, `TraceDispatcher._ClosureResolver`
+관련 코드: `ScopeResolver.resolve`, `ScopeResolver.resolve_cell`
 
 ---
 
@@ -46,19 +46,19 @@ def outer():
     return inner
 ```
 
-`inner` 프레임은 매 호출마다 새로 생기지만 `n`은 셀에 남아 이어진다. `outer()`를 두 번 호출하면 같은 코드 객체를 공유하는 **서로 다른 셀 두 개**가 생긴다. 따라서 identity와 이력을 프레임에 묶으면 안 되고, `TraceDispatcher`는 셀을 키로 하는 저장소를 따로 둔다.
+`inner` 프레임은 매 호출마다 새로 생기지만 `n`은 셀에 남아 이어진다. `outer()`를 두 번 호출하면 같은 코드 객체를 공유하는 **서로 다른 셀 두 개**가 생긴다. 따라서 identity와 이력을 프레임에 묶으면 안 되고, 셀(`id(cell)`)을 키로 삼는다.
 
-- `_enclosing_var_ids` — 셀별 변수 ID
-- `_enclosing_states` — 셀별 이전 상태
-- `_enclosing_cell_refs` — 셀에 대한 강한 참조
+- `VariableTracker._states[id(cell)]` — 셀별 이전 상태(비교 기준)
+- `_enclosing_var_ids` — 셀별 변수 ID (dispatcher)
+- `_enclosing_cell_refs` — 셀에 대한 강한 참조 (dispatcher)
 
-셀은 해시 불가능하므로 세 딕셔너리 모두 `id(cell)`을 키로 쓴다. `id()`는 객체가 죽으면 재사용되므로, `_enclosing_cell_refs`가 강한 참조로 셀을 붙잡아 GC 후 같은 주소에 다른 객체가 들어와 이력이 뒤섞이는 것을 막는다.
+셀은 해시 불가능하므로 모두 `id(cell)`을 키로 쓴다. `id()`는 객체가 죽으면 재사용되므로, `_enclosing_cell_refs`가 강한 참조로 셀을 붙잡아 GC 후 같은 주소에 다른 객체가 들어와 이력이 뒤섞이는 것을 막는다.
 
 ## 셀을 찾는 방법: 휴리스틱이라는 점
 
 `sys.settrace` 콜백은 **프레임만 넘겨준다.** 실측상 `frame.f_locals`, `gc.get_referents(frame)`, `PyFrame_GetVar` 모두 **역참조된 값만** 주고 셀 객체는 주지 않는다 — 셀은 함수 객체의 `__closure__`로만 접근된다.
 
-그래서 `_ClosureResolver`는 역방향으로, 호출자 프레임(`frame.f_back`)의 네임스페이스를 훑어 다음을 만족하는 콜러블을 찾는다.
+그래서 `ScopeResolver.resolve_cell`은 역방향으로, 호출자 프레임(`frame.f_back`)의 네임스페이스를 훑어 다음을 만족하는 콜러블을 찾는다.
 
 1. 추적 중인 프레임과 **같은 코드 객체**를 쓴다
 2. 해당 인덱스의 셀 내용이 추적 중인 프레임의 **현재 값과 동일 객체**다

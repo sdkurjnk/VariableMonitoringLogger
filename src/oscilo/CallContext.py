@@ -12,8 +12,7 @@ def is_suspended_return(frame):
     code = getattr(frame, "f_code", None)
     bytecode = getattr(code, "co_code", b"")
 
-    # Python 3.11/3.12 may report f_lasti at YIELD_VALUE, while
-    # Python 3.13 reports the following RESUME instruction.
+    # Python 3.11/3.12는 f_lasti를 YIELD_VALUE에서, 3.13은 그다음 RESUME에서 보고한다.
     candidate_offsets = (
         instruction_offset,
         instruction_offset - 2,

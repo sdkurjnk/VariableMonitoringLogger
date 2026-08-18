@@ -12,7 +12,7 @@ class HistoryBuffer:
         self._history = []
 
     def append(self, name, var_id, data, event, domain=None, line=None, func=None, call_id=None, parent_call_id=None, call_depth=None,):
-        # Store a readable domain label so JSONL output is easy to inspect.
+        # JSONL을 읽기 쉽게 domain을 라벨로 저장한다.
         history_entry = {
             "name": name,
             "var_id": var_id,
@@ -28,11 +28,11 @@ class HistoryBuffer:
         self._history.append(history_entry)
 
     def _get_domain_label(self, domain):
-        # Use UNKNOWN when the resolved scope is not local or global.
+        # 매핑에 없는 domain은 UNKNOWN으로.
         return self._DOMAIN_LABELS.get(domain, self._UNKNOWN_DOMAIN_LABEL)
 
     def getHistory(self):
-        # Return a deep copy so callers cannot mutate the internal history.
+        # 호출자가 내부 이력을 변형 못 하도록 깊은 복사본을 반환한다.
         return copy.deepcopy(self._history)
 
     def clearBuffer(self):
