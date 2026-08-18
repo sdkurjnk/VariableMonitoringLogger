@@ -41,7 +41,7 @@ def read_jsonl(filename):
 
 
 def finalize_and_read_logs(monitor, filename):
-    monitor._finalSave()
+    monitor.finalSave()
     return read_jsonl(filename)
 
 

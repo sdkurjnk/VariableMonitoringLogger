@@ -16,7 +16,7 @@ def read_jsonl(filename):
 
 def finalize_and_read_logs(monitor, filename):
     # Flush pending tracking events before reading the generated log file.
-    monitor._finalSave()
+    monitor.finalSave()
     return read_jsonl(filename)
 
 def get_latest_entries_by_name(logs):

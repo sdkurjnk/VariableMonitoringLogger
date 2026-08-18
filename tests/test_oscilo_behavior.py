@@ -16,7 +16,7 @@ def read_jsonl(filename):
 
 def finalize_and_read_logs(monitor, filename):
     # Force VML to flush tracked events before assertions inspect the log file.
-    monitor._finalSave()
+    monitor.finalSave()
     return read_jsonl(filename)
 
 class TestVMLBehavior(unittest.TestCase):
