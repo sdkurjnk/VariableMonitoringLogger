@@ -6,7 +6,7 @@ from .HistoryBuffer import HistoryBuffer
 from .TraceDispatcher import TraceDispatcher
 
 
-class _Oscilo:
+class Oscilo:
     def __init__(self, fileName="oscilo.jsonl"):
         self.fileName = fileName
         self.buffer = HistoryBuffer()

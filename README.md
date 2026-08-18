@@ -175,10 +175,10 @@ Unchanged values produce no record, and immutable values are skipped entirely wh
 ```
 src/oscilo/
 ├── __init__.py          # public API (register) and single-instance management
-├── _core.py             # monitor implementation and atexit save logic
 ├── CallContext.py       # lazy call-context tracking (call_id / parent_call_id / call_depth)
 ├── FileWriter.py        # JSONL output
 ├── HistoryBuffer.py     # in-memory history buffer
+├── Oscilo.py            # monitor implementation and atexit save logic
 ├── ScopeResolver.py     # LEGB scope resolution (local/enclosing/global/builtin)
 ├── TraceDispatcher.py   # sys.settrace event handling
 ├── VariableTracker.py   # per-variable change detection and value snapshots

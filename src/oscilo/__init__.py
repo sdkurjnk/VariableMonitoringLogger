@@ -3,7 +3,7 @@ import threading
 from importlib.metadata import PackageNotFoundError, version
 
 from . import oscilo_engine  # C 확장이 없으면 import 시점에 바로 실패하도록 즉시 import.
-from ._core import _Oscilo
+from .Oscilo import Oscilo
 
 try:
     __version__ = version("oscilo")
@@ -25,7 +25,7 @@ def register(varName):
         # 동시 첫 호출이 인스턴스를 둘 만들지 않도록 double-checked locking. (이슈 #29)
         with _instance_lock:
             if _instance is None:
-                _instance = _Oscilo()
+                _instance = Oscilo()
 
     # 인스턴스가 한 단계 더 깊이 있으므로 호출자 frame을 명시적으로 넘긴다.
     _instance.register(varName, sys._getframe(1))

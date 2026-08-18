@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-from oscilo._core import _Oscilo
+from oscilo.Oscilo import Oscilo
 from oscilo.FileWriter import FileWriter
 
 INIT_EVENT = "init"
@@ -55,7 +55,7 @@ class TestTracerExceptionIsolation(unittest.TestCase):
 
             def run():
                 obj = RaisesOnCompare(1)
-                monitor = _Oscilo(filename)
+                monitor = Oscilo(filename)
                 monitor.register("obj")
 
                 # In-place mutation with the reference unchanged forces the
@@ -86,7 +86,7 @@ class TestTracerExceptionIsolation(unittest.TestCase):
                 broken = RaisesOnCompare(1)
                 healthy = [1, 2]
 
-                monitor = _Oscilo(filename)
+                monitor = Oscilo(filename)
                 monitor.register("broken")
                 monitor.register("healthy")
 
@@ -164,7 +164,7 @@ class TestFileWriterExceptionIsolation(unittest.TestCase):
 
             def run():
                 point = PlainCustomObject(1)
-                monitor = _Oscilo(filename)
+                monitor = Oscilo(filename)
                 monitor.register("point")
 
                 point.x = 2

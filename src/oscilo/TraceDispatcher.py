@@ -61,9 +61,6 @@ class TraceDispatcher:
         # tracker가 해석한 cell들을 기록해, unregister가 그 tracker 소유 cell만 정리하게 한다.
         self._tracker_cells = {}
 
-    def setBuffer(self, buffer):
-        self._bufferRef = buffer
-
     def _is_enclosing_case(self, domain, tracker):
         if domain == ENCLOSING:
             return True
