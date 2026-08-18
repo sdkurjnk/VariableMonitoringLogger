@@ -52,16 +52,15 @@ class TraceDispatcher:
         # 전체가 비워지므로, 여기 있는 어떤 것도 frame보다 오래 살아남지 않는다.
         self._frame_states = {}
 
-        # ENCLOSING(nonlocal/freevar) 변수는 어느 한 call frame이 아니라
-        # closure cell이 소유하므로, 그 identity와 값 이력은 소유 frame의
-        # return 이후에도 살아남아야 한다(closure는 자신을 만든 함수가
-        # 반환된 지 한참 후에도 호출될 수 있다). `cell` 객체는 해시 불가능
-        # 하므로 아래 세 dict는 모두 id(cell)을 key로 쓴다; _enclosing_cell_refs는
+        # ENCLOSING(nonlocal/freevar) 변수의 값 이력은 이제 tracker가 소유하되,
+        # 아래 두 dict는 dispatcher가 계속 관리한다. cell이 소유한 identity와
+        # 이력은 소유 frame의 return 이후에도 살아남아야 하므로(closure는 자신을
+        # 만든 함수가 반환된 지 한참 후에도 호출될 수 있다), `cell` 객체는 해시
+        # 불가능하므로 아래 dict는 id(cell)을 key로 쓴다; _enclosing_cell_refs는
         # 각 cell에 대한 strong reference를 붙잡아 둬서, 추적이 활성화된 동안
         # 그 id가 다른 무관한 객체에 재사용되지 않게 한다. GLOBAL 저장소와
         # 마찬가지로 stop()에서 비워진다.
         self._enclosing_var_ids = {}
-        self._enclosing_states = {}
         self._enclosing_cell_refs = {}
 
         # "이 frame에서 이 ENCLOSING 변수를 뒷받침하는 cell이 무엇인지"를
@@ -74,8 +73,8 @@ class TraceDispatcher:
         self._frame_cell_cache = {}
 
         # 특정 ENCLOSING tracker에 대해 지금까지 해석된 모든 cell을 기록해서,
-        # unregister()가 _enclosing_var_ids / _enclosing_states에 새어나가게
-        # 두지 않고 그 tracker가 소유한 상태만 정확히 정리할 수 있게 한다.
+        # unregister()가 _enclosing_var_ids / _enclosing_cell_refs에 새어나가게
+        # 두지 않고 그 tracker가 소유한 cell만 정확히 정리할 수 있게 한다.
         self._tracker_cells = {}
 
     def setBuffer(self, buffer):
@@ -149,14 +148,12 @@ class TraceDispatcher:
         # 현재 call_id로 강등된다(_log_event에서 처리).
         storage_key = cell_key if cell_key is not None else frame
 
-        return self._check_and_log(
-            frame,
-            tracker,
-            self._enclosing_states,
-            storage_key,
-            ENCLOSING,
-            cell=cell_key,
-        )
+        event_name, new_state = tracker.check_owned(frame, ENCLOSING, storage_key)
+
+        if event_name in BUFFERED_EVENTS:
+            self._log_event(frame, tracker, event_name, new_state, ENCLOSING, cell=cell_key)
+
+        return event_name, new_state
 
     def register(self, varName, frame):
         if frame is None:
@@ -231,11 +228,13 @@ class TraceDispatcher:
         self._global_states.pop(tracker, None)
         self._global_var_ids.pop(tracker, None)
 
+        # The enclosing comparison state itself now lives in the tracker and is
+        # dropped by tracker.reset() above; only the dispatcher-owned var_id and
+        # cell strong-ref bookkeeping is purged here.
         cell_keys = self._tracker_cells.pop(tracker, None)
         if cell_keys:
             for cell_key in cell_keys:
                 self._enclosing_var_ids.pop(cell_key, None)
-                self._enclosing_states.pop(cell_key, None)
                 self._enclosing_cell_refs.pop(cell_key, None)
 
         self._frame_cache.clear()
@@ -271,7 +270,6 @@ class TraceDispatcher:
         self._global_states.clear()
         self._global_var_ids.clear()
         self._enclosing_var_ids.clear()
-        self._enclosing_states.clear()
         self._enclosing_cell_refs.clear()
         self._frame_cell_cache.clear()
         self._tracker_cells.clear()
@@ -381,11 +379,15 @@ class TraceDispatcher:
 
     def _forget_frame_local_states(self, frame):
         # LOCAL state is frame-keyed and dies with the frame, mirroring the old
-        # _frame_states.pop(frame) on return. ENCLOSING/GLOBAL keep their own
-        # lifetimes and are untouched here.
+        # _frame_states.pop(frame) on return. ENCLOSING state (cell-keyed, or the
+        # frame-keyed fallback) must outlive the frame — a closure can be called
+        # long after its defining frame returns — so enclosing trackers are
+        # skipped here and cleared only on unregister/stop.
         local_relevant, _ = self._relevant_for(frame)
         for tracker in local_relevant:
-            tracker.forget(frame)
+            domain, _ = self._resolver.resolve(frame, tracker.varName)
+            if not self._is_enclosing_case(domain, tracker):
+                tracker.forget(frame)
 
     def _get_cache_entry(self, frame):
         code = frame.f_code
