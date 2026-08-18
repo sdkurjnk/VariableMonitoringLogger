@@ -161,7 +161,7 @@ class TestVariableTrackerState(unittest.TestCase):
         target = [1, 2]
         frame = sys._getframe()
 
-        event_name, state = self.tracker.check(
+        event_name, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -176,13 +176,13 @@ class TestVariableTrackerState(unittest.TestCase):
         target = (1, 2)
         frame = sys._getframe()
 
-        _, state = self.tracker.check(
+        _, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
             None,
         )
-        event_name, new_state = self.tracker.check(
+        event_name, new_state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -196,7 +196,7 @@ class TestVariableTrackerState(unittest.TestCase):
         target = [1]
         frame = sys._getframe()
 
-        _, state = self.tracker.check(
+        _, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -205,7 +205,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
         target.append(2)
 
-        event_name, new_state = self.tracker.check(
+        event_name, new_state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -221,7 +221,7 @@ class TestVariableTrackerState(unittest.TestCase):
         target = ([1, 2], 3)
         frame = sys._getframe()
 
-        _, state = self.tracker.check(
+        _, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -230,7 +230,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
         target[0].append(4)
 
-        event_name, new_state = self.tracker.check(
+        event_name, new_state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -246,7 +246,7 @@ class TestVariableTrackerState(unittest.TestCase):
         target = "before"
         frame = sys._getframe()
 
-        _, state = self.tracker.check(
+        _, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -255,7 +255,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
         target = "".join(["af", "ter"])
 
-        event_name, new_state = self.tracker.check(
+        event_name, new_state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -270,7 +270,7 @@ class TestVariableTrackerState(unittest.TestCase):
         target = [1]
         frame = sys._getframe()
 
-        _, state = self.tracker.check(
+        _, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -279,7 +279,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
         del target
 
-        event_name, new_state = self.tracker.check(
+        event_name, new_state = self.tracker.evaluate(
             frame,
             NOT_FOUND,
             "target",
@@ -292,7 +292,7 @@ class TestVariableTrackerState(unittest.TestCase):
     def test_frame_state_check_returns_not_found_without_previous_state(self):
         frame = sys._getframe()
 
-        event_name, new_state = self.tracker.check(
+        event_name, new_state = self.tracker.evaluate(
             frame,
             NOT_FOUND,
             "missing_target",
@@ -321,7 +321,7 @@ class TestVariableTrackerState(unittest.TestCase):
             FRAME_STATE_GLOBAL_VALUE = ["before"]
             frame = sys._getframe()
 
-            event_name, state = self.tracker.check(
+            event_name, state = self.tracker.evaluate(
                 frame,
                 GLOBAL,
                 "FRAME_STATE_GLOBAL_VALUE",
@@ -333,7 +333,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
             FRAME_STATE_GLOBAL_VALUE.append("after")
 
-            event_name, new_state = self.tracker.check(
+            event_name, new_state = self.tracker.evaluate(
                 frame,
                 GLOBAL,
                 "FRAME_STATE_GLOBAL_VALUE",
@@ -351,7 +351,7 @@ class TestVariableTrackerState(unittest.TestCase):
         def check_target(prev_state):
             # Referencing target makes it a free variable in this frame.
             target
-            return self.tracker.check(
+            return self.tracker.evaluate(
                 sys._getframe(),
                 ENCLOSING,
                 "target",
@@ -374,7 +374,7 @@ class TestVariableTrackerState(unittest.TestCase):
         target = ["first"]
         frame = sys._getframe()
 
-        event_name, state = self.tracker.check(
+        event_name, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -386,7 +386,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
         del target
 
-        event_name, state = self.tracker.check(
+        event_name, state = self.tracker.evaluate(
             frame,
             NOT_FOUND,
             "target",
@@ -398,7 +398,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
         target = ["second"]
 
-        event_name, state = self.tracker.check(
+        event_name, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -454,7 +454,7 @@ class TestVariableTrackerState(unittest.TestCase):
         target = threading.Lock()
         frame = sys._getframe()
 
-        event_name, state = self.tracker.check(
+        event_name, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -467,7 +467,7 @@ class TestVariableTrackerState(unittest.TestCase):
         # Same lock object kept across checks must settle on NO_CHANGE_EVENT
         # instead of re-attempting deepcopy and spamming UPDATED_EVENT.
         for _ in range(3):
-            event_name, state = self.tracker.check(
+            event_name, state = self.tracker.evaluate(
                 frame,
                 LOCAL,
                 "target",
@@ -479,7 +479,7 @@ class TestVariableTrackerState(unittest.TestCase):
         target = threading.Lock()
         frame = sys._getframe()
 
-        event_name, state = self.tracker.check(
+        event_name, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -489,7 +489,7 @@ class TestVariableTrackerState(unittest.TestCase):
 
         target = 42
 
-        event_name, state = self.tracker.check(
+        event_name, state = self.tracker.evaluate(
             frame,
             LOCAL,
             "target",
@@ -534,7 +534,7 @@ class TestVariableTrackerState(unittest.TestCase):
         def visit(n):
             frame = sys._getframe()
 
-            event_name, state = tracker.check(
+            event_name, state = tracker.evaluate(
                 frame,
                 LOCAL,
                 "n",
@@ -547,7 +547,7 @@ class TestVariableTrackerState(unittest.TestCase):
             if n > 1:
                 visit(n - 1)
 
-            event_name, restored_state = tracker.check(
+            event_name, restored_state = tracker.evaluate(
                 frame,
                 LOCAL,
                 "n",

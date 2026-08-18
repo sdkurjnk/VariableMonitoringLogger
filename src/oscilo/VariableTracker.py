@@ -95,16 +95,11 @@ class VariableTracker:
             state["copy_failed"] = True
             return _SNAPSHOT_COPY_FAILED
 
-    def check(self, frame, domain, varName=None, prev_state=None):
-        # 넘겨준 prev_state로 하는 무상태 평가.
-        # dispatcher는 이제 상태를 소유·저장하는 check_owned로 추적하고, 이 메서드는 일회성 검사·테스트용 순수 헬퍼로 남는다.
-        return self._evaluate(frame, domain, varName, prev_state)
-
     def check_owned(self, frame, domain, key):
         # dispatcher는 "이 인스턴스 검사해"만 한다.
         # 트래커가 key(LOCAL이면 frame)로 자기 상태를 조회·저장한다.
         prev_state = self._states.get(key)
-        event_name, new_state = self._evaluate(frame, domain, self.varName, prev_state)
+        event_name, new_state = self.evaluate(frame, domain, self.varName, prev_state)
 
         if new_state is None:
             self._states.pop(key, None)
@@ -120,7 +115,7 @@ class VariableTracker:
     def reset(self):
         self._states.clear()
 
-    def _evaluate(
+    def evaluate(
         self,
         frame,
         domain,
