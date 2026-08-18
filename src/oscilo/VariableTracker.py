@@ -95,16 +95,16 @@ class VariableTracker:
             # and raising again on every subsequent line event. This is safe
             # because get_snapshot() has exactly one production caller
             # (TraceDispatcher._log_event), which always receives the same
-            # dict object already stored by _check_and_log, so the demotion
-            # is observed by later check() calls on that state.
+            # dict object already stored in self._states by check_owned, so the
+            # demotion is observed by later check_owned() calls on that state.
             state["copy"] = None
             state["copy_failed"] = True
             return _SNAPSHOT_COPY_FAILED
 
     def check(self, frame, domain, varName=None, prev_state=None):
-        # Transitional entry point: GLOBAL/ENCLOSING still have the dispatcher
-        # pass the previous state in. LOCAL goes through check_owned instead so
-        # the tracker owns its own per-frame state.
+        # Stateless evaluation against an explicitly supplied prev_state. The
+        # dispatcher now drives all tracking through check_owned (which owns and
+        # stores state); this remains a pure helper for one-off checks and tests.
         return self._evaluate(frame, domain, varName, prev_state)
 
     def check_owned(self, frame, domain, key):

@@ -16,6 +16,10 @@ DELETED_EVENT = "deleted"
 # cell을 찾지 못함"(진짜 None)을 구분하기 위한 sentinel.
 _UNRESOLVED = object()
 
+# GLOBAL 변수는 관찰하는 모든 frame이 공유하는 단일 timeline을 가지므로,
+# tracker는 이 고정 key 하나로 자기 GLOBAL 상태를 보관한다.
+GLOBAL_STATE_KEY = object()
+
 class TraceDispatcher:
     def __init__(self, buffer=None):
         self._trackers = []
@@ -39,12 +43,9 @@ class TraceDispatcher:
         self._registered_local = {}
         self._registered_global = {}
 
-        # GLOBAL 변수는 그것을 관찰하는 모든 frame이 공유하는 단일 timeline을
-        # 가지므로, 이전 상태는 어느 한 frame의 state가 아니라 여기에 산다.
-        self._global_states = {}
-
-        # GLOBAL 변수는 이후 다른 call frame에서 변경이 일어나도, 처음
-        # 등록됐던 frame의 ID를 계속 유지한다.
+        # GLOBAL 변수의 값 이력은 이제 tracker가 GLOBAL_STATE_KEY 하나로
+        # 소유한다. dispatcher는 var_id만 관리하는데, GLOBAL 변수는 이후 다른
+        # call frame에서 변경이 일어나도 처음 등록됐던 frame의 ID를 유지한다.
         self._global_var_ids = {}
 
         # frame 객체 자체를 key로 하는, 활성 frame별 local/enclosing state.
@@ -206,7 +207,7 @@ class TraceDispatcher:
             )
         else:
             self._guarded_check_and_log(
-                self._check_and_log, frame, tracker, self._global_states, tracker, resolved_domain
+                self._check_and_log_global, frame, tracker, resolved_domain
             )
 
         return tracker
@@ -225,7 +226,6 @@ class TraceDispatcher:
         if globals_dict is not None:
             self._registered_global.pop((tracker.varName, id(globals_dict)), None)
 
-        self._global_states.pop(tracker, None)
         self._global_var_ids.pop(tracker, None)
 
         # The enclosing comparison state itself now lives in the tracker and is
@@ -267,7 +267,6 @@ class TraceDispatcher:
         self._tracker_globals.clear()
         self._registered_local.clear()
         self._registered_global.clear()
-        self._global_states.clear()
         self._global_var_ids.clear()
         self._enclosing_var_ids.clear()
         self._enclosing_cell_refs.clear()
@@ -353,17 +352,13 @@ class TraceDispatcher:
             self._get_context_call_depth(context),
         )
 
-    def _check_and_log(self, frame, tracker, storage, key, domain, cell=None):
-        prev_state = storage.get(key)
-        event_name, new_state = tracker.check(frame, domain, tracker.varName, prev_state)
-
-        if new_state is None:
-            storage.pop(key, None)
-        else:
-            storage[key] = new_state
+    def _check_and_log_global(self, frame, tracker, domain):
+        # GLOBAL variables share one timeline across every observing frame, so
+        # the tracker owns a single state under GLOBAL_STATE_KEY.
+        event_name, new_state = tracker.check_owned(frame, domain, GLOBAL_STATE_KEY)
 
         if event_name in BUFFERED_EVENTS:
-            self._log_event(frame, tracker, event_name, new_state, domain, cell=cell)
+            self._log_event(frame, tracker, event_name, new_state, domain)
 
         return event_name, new_state
 
@@ -436,7 +431,7 @@ class TraceDispatcher:
         for tracker in global_relevant:
             domain, _ = self._resolver.resolve(frame, tracker.varName)
             self._guarded_check_and_log(
-                self._check_and_log, frame, tracker, self._global_states, tracker, domain
+                self._check_and_log_global, frame, tracker, domain
             )
 
     def _make_line_tracer(self):
