@@ -2,7 +2,7 @@
 
 `TraceDispatcher`가 들고 있는 딕셔너리들이 무엇을 책임지고 어떻게 맞물리는지 정리한다.
 
-관련 코드: `TraceDispatcher.__init__`, `register`, `_get_cache_entry`, `_relevant_for`, `_check_and_log`, `unregister`, `_stop_tracing`
+관련 코드: `TraceDispatcher.__init__`, `register`, `_relevant_for`, `_check_and_log_local`/`_global`/`_enclosing`, `VariableTracker.check_owned`, `unregister`, `_stop_tracing`
 
 ---
 
@@ -12,9 +12,9 @@
 |---|---|---|
 | **등록** | `_registered_local`, `_registered_global` | 이 변수는 이미 등록되어 있는가? |
 | **선별** | `_frame_cache`, `_tracker_codes`, `_tracker_globals` | 이 프레임을 추적해야 하는가? |
-| **상태** | `_frame_states`, `_global_states` | 이 변수의 직전 값은 무엇이었는가? |
+| **상태** | `VariableTracker._states` | 이 변수의 직전 값은 무엇이었는가? |
 
-수명이 서로 다르다 — 등록 정보는 tracker와 함께 살고, 선별 캐시는 tracker 목록이 바뀔 때 무효화되며, 상태는 소유자(프레임 또는 tracker)를 따라간다.
+수명이 서로 다르다 — 등록 정보는 tracker와 함께 살고, 선별 캐시는 tracker 목록이 바뀔 때 무효화되며, 비교 상태는 tracker가 소유하되 스코프 인스턴스(프레임·셀·전역)별로 키잉된다.
 
 ---
 
@@ -68,26 +68,32 @@ global_relevant = [t for t in global_candidates
 
 ---
 
-## 상태 층: 저장소 간접화
+## 상태 층: tracker가 소유하는 비교 상태
 
-`_check_and_log`는 저장소와 키를 **인자로 받는다.**
+변수의 직전 값(비교 기준)은 **`VariableTracker._states`가 소유한다.** dispatcher는 값을 들지 않고 "이 스코프 인스턴스를 검사해"라고 key만 넘긴다.
 
 ```python
-def _check_and_log(self, frame, tracker, storage, key, domain, cell=None):
-    prev_state = storage.get(key)
-    ...
-    storage[key] = new_state
+def check_owned(self, frame, domain, key):
+    prev_state = self._states.get(key)
+    event, new_state = self.evaluate(frame, domain, self.varName, prev_state)
+    if new_state is None:
+        self._states.pop(key, None)   # 삭제 이벤트
+    else:
+        self._states[key] = new_state
+    return event, new_state
 ```
 
-| 도메인 | storage | key | 근거 |
+dispatcher의 세 진입점이 도메인별로 key만 다르게 넘긴다.
+
+| 도메인 | 진입점 | key | 근거 |
 |---|---|---|---|
-| LOCAL | `frame_state` | `varName` | 값이 프레임마다 독립 |
-| GLOBAL | `self._global_states` | `tracker` | 모든 프레임이 하나의 타임라인 공유 |
-| ENCLOSING | `self._enclosing_states` | `id(cell)` | 값의 소유자가 셀 |
+| LOCAL | `_check_and_log_local` | `frame` | 값이 프레임(재귀 호출)마다 독립 |
+| GLOBAL | `_check_and_log_global` | `GLOBAL_STATE_KEY` | 모든 프레임이 하나의 타임라인 공유 |
+| ENCLOSING | `_check_and_log_enclosing` | `id(cell)` (미해석 시 `frame`) | 값의 소유자가 셀 |
 
-같은 판정 로직을 쓰며 **상태 소유자만 갈아끼우는** 구조라, 도메인별 판정 코드를 세 벌 만들 필요가 없다.
+한 tracker가 자기 변수의 모든 인스턴스를 `_states`에 키잉해 들고 있어 재귀 호출도 프레임별로 분리된다. dispatcher는 판정·저장에서 손을 떼고 **라우팅·로깅·식별자(var_id)** 만 담당한다.
 
-**GLOBAL을 프레임 상태에 둘 수 없는 이유** — 전역은 어느 프레임에서 바꾸든 하나의 변수다. 프레임별로 이전 값을 들면 `foo`에서 바꾼 값이 `bar`의 기준값에 반영되지 않아 중복 기록되거나 놓친다. 같은 이유로 `_global_var_ids`는 이후 어느 프레임에서 변경돼도 **처음 등록된 프레임의 ID**를 유지해, 이력을 한 변수의 것으로 이어 읽게 한다.
+**GLOBAL을 프레임 상태에 둘 수 없는 이유** — 전역은 어느 프레임에서 바꾸든 하나의 변수다. 프레임별로 이전 값을 들면 `foo`에서 바꾼 값이 `bar`의 기준값에 반영되지 않아 중복 기록되거나 놓친다. 그래서 GLOBAL은 `GLOBAL_STATE_KEY` 하나로 단일 타임라인을 든다. 같은 이유로 `_global_var_ids`는 이후 어느 프레임에서 변경돼도 **처음 등록된 프레임의 ID**를 유지해, 이력을 한 변수의 것으로 이어 읽게 한다.
 
 ---
 
@@ -102,24 +108,25 @@ resolve() → 도메인 판정
              → _registered_* / _tracker_codes / _tracker_globals 기록
              → _frame_cache.clear()
   → _start_tracing()  → sys.settrace(_trace_calls)
-  → _ensure_frame_tracking(frame)  → _frame_states 항목 생성 + f_trace 부착
-  → _check_and_log(...)  → 초기값 기록 (init)
+  → _ensure_frame_tracking(frame)  → _frame_states에 추적 마커 생성 + f_trace 부착
+  → _check_and_log_local/global/enclosing(...)  → tracker.check_owned로 초기값 기록 (init)
 ```
 
 **실행 중인 한 줄**
 ```
-line 이벤트 → trace_lines(frame_state 캡처)
-  → _process_frame(frame, frame_state)
+line 이벤트 → trace_lines
+  → _process_frame(frame)
   → _relevant_for(frame)   [_get_cache_entry + _tracker_codes/_globals 확정]
-  → local  → _check_and_log(frame_state, varName)
-    global → _check_and_log(_global_states, tracker)
+  → local     → _check_and_log_local(frame, tracker, domain)    [key=frame]
+    global    → _check_and_log_global(frame, tracker, domain)   [key=GLOBAL_STATE_KEY]
+    enclosing → _check_and_log_enclosing(frame, tracker, name)  [key=id(cell)]
   → 변경됨 → HistoryBuffer.append()
 ```
 
 **정리**
-- **프레임 실제 종료** — suspend가 아닌 실제 종료에서 `_frame_states`·`_frame_cell_cache`의 해당 프레임만 제거한다. 제너레이터와 코루틴의 suspend에서는 resume 이후 같은 비교 기준을 사용해야 하므로 상태를 유지한다.
-- **`unregister(tracker)`** — 그 tracker가 소유한 것만 걷어낸다. `_tracker_codes`/`_tracker_globals`에서 스코프를 꺼내 중복 제거 키를 역산하고, `_tracker_cells`의 셀 목록으로 ENCLOSING 저장소를 정리한다. 셀 목록이 없으면 어느 셀이 어느 tracker 것인지 알 수 없어 남의 상태까지 지운다.
-- **`_stop_tracing()`** — `sys.settrace(None)` 이후엔 어떤 상태도 무효하므로 전부 `clear()`.
+- **프레임 실제 종료** — `_forget_frame_local_states(frame)`가 LOCAL tracker들의 프레임 상태를 버리고(`tracker.forget(frame)`), `_frame_states`·`_frame_cell_cache`의 해당 프레임 마커를 제거한다. ENCLOSING 상태는 셀이 소유하므로 프레임 종료로 지우지 않는다. 제너레이터·코루틴의 suspend에서는 resume 이후 같은 비교 기준을 써야 하므로 전부 유지한다.
+- **`unregister(tracker)`** — `tracker.reset()`으로 그 tracker의 `_states`를 통째로 비운다. dispatcher는 `_tracker_codes`/`_tracker_globals`로 중복 제거 키를 역산하고, `_tracker_cells`의 셀 목록으로 `_enclosing_var_ids`/`_enclosing_cell_refs`만 정리한다. 셀 목록이 없으면 어느 셀이 어느 tracker 것인지 알 수 없어 남의 것까지 지운다.
+- **`_stop_tracing()`** — `sys.settrace(None)` 이후엔 어떤 상태도 무효하므로 tracker들을 `reset()`하고 dispatcher dict를 전부 `clear()`.
 
 ---
 
@@ -133,12 +140,11 @@ line 이벤트 → trace_lines(frame_state 캡처)
 | `_tracker_globals` | tracker | `unregister` / `stop` |
 | `_tracker_cells` | tracker | `unregister` / `stop` |
 | `_frame_cache` | `f_code` | tracker 목록 변경 시 전체 무효화 |
-| `_global_states` | tracker | `unregister` / `stop` |
 | `_global_var_ids` | tracker | `unregister` / `stop` |
-| `_enclosing_states` | `id(cell)` | `unregister` / `stop` |
 | `_enclosing_var_ids` | `id(cell)` | `unregister` / `stop` |
 | `_enclosing_cell_refs` | `id(cell)` | `unregister` / `stop` |
-| `_frame_states` | frame | 해당 프레임의 실제 종료 / `stop` |
+| `_frame_states` (추적 마커) | frame | 해당 프레임의 실제 종료 / `stop` |
 | `_frame_cell_cache` | frame | 해당 프레임의 실제 종료 / `stop` |
+| **`VariableTracker._states`** | frame · `id(cell)` · `GLOBAL_STATE_KEY` | LOCAL은 프레임 종료 시 `forget`, 전체는 `unregister`/`stop`의 `reset` |
 
-프레임을 키로 쓰는 둘만 프레임 수명을 따르고 나머지는 tracker 수명을 따른다. ENCLOSING 저장소가 프레임이 아니라 셀에 묶인 이유는 [스코프 해석](./ScopeResolution.md)을 참고.
+비교 상태는 이제 tracker가 소유한다. dispatcher가 드는 것은 식별자·정리용 부기(`_*_var_ids`, `_enclosing_cell_refs`)와 프레임 추적 마커(`_frame_states`, `_frame_cell_cache`)뿐이다. ENCLOSING 상태가 프레임이 아니라 셀(`id(cell)`)에 묶인 이유는 [스코프 해석](./ScopeResolution.md)을 참고.

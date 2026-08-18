@@ -54,7 +54,7 @@ C 호출도 공짜가 아니므로 `VariableTracker.check`가 앞에서 한 번 
 
 ## 예외 격리: 관찰이 추적 대상을 절대 중단시키지 않는다
 
-"감지를 놓치는 것이 트레이스 콜백에서 예외를 던져 추적 대상 프로그램 자체를 중단시키는 것보다 낫다"는 위 트레이드오프 판단은 이슈 #52에서 한 단계 더 넓어졌다. `deepcopy` 실패뿐 아니라, 4단계 값 비교(`PyObject_RichCompareBool`)가 추적 대상 값의 `__eq__`/`__ne__` 예외로 `-1`을 반환하는 경우도 `TraceDispatcher._check_and_log`를 거쳐 `sys.settrace` 콜백 밖, 즉 사용자 코드 스택으로 그대로 전파될 수 있었다. `_guarded_check_and_log`가 `register()`와 `_process_frame()`의 모든 check-and-log 호출을 tracker/이벤트 단위로 감싸, 어느 한 트래커의 비교가 계속 실패해도 다른 트래커와 이후 이벤트는 영향받지 않는다.
+"감지를 놓치는 것이 트레이스 콜백에서 예외를 던져 추적 대상 프로그램 자체를 중단시키는 것보다 낫다"는 위 트레이드오프 판단은 이슈 #52에서 한 단계 더 넓어졌다. `deepcopy` 실패뿐 아니라, 4단계 값 비교(`PyObject_RichCompareBool`)가 추적 대상 값의 `__eq__`/`__ne__` 예외로 `-1`을 반환하는 경우도 `TraceDispatcher`의 check-and-log 경로(`_check_and_log_local`/`_global`/`_enclosing`)를 거쳐 `sys.settrace` 콜백 밖, 즉 사용자 코드 스택으로 그대로 전파될 수 있었다. `_guarded_check_and_log`가 `register()`와 `_process_frame()`의 모든 check-and-log 호출을 tracker/이벤트 단위로 감싸, 어느 한 트래커의 비교가 계속 실패해도 다른 트래커와 이후 이벤트는 영향받지 않는다.
 
 같은 원칙이 저장 경로에도 적용된다. `deepcopy`는 성공하지만 JSON 직렬화는 불가능한 값(평범한 커스텀 객체 등)이 `data` 필드에 남아있으면, 기존에는 `FileWriter.write`의 `json.dumps` 호출 하나가 `atexit` 훅 안에서 조용히 예외를 삼키며 그 세션의 로그 파일 전체를 0바이트로 만들었다. `FileWriter._serialize_entry`는 우선 그대로 직렬화를 시도하고, 실패하면 `default=repr`로 재시도해 값만 문자열로 대체하며, 그마저 실패하는 극단적인 경우(예: `__repr__` 자체가 예외를 던짐)에만 해당 엔트리 하나를 건너뛴다.
 
