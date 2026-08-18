@@ -161,10 +161,10 @@ class TestVMlogComponents(unittest.TestCase):
             target.append("changed")
 
             # Saving twice should not rewrite or duplicate already flushed history.
-            monitor._finalSave()
+            monitor.finalSave()
             first_save = read_text(filename)
 
-            monitor._finalSave()
+            monitor.finalSave()
             second_save = read_text(filename)
 
         self.assertEqual(first_save, second_save)

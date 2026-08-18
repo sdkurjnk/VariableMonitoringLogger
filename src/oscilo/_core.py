@@ -15,7 +15,7 @@ class _Oscilo:
         self._saved = False
 
         # Register a final save so logs are written even without manual cleanup.
-        atexit.register(self._finalSave)
+        atexit.register(self.finalSave)
 
     def register(self, varName, frame=None):
         # Pass the caller's frame so the dispatcher can resolve the variable.
@@ -24,7 +24,7 @@ class _Oscilo:
 
         self.dispatcher.register(varName, frame=frame)
 
-    def _finalSave(self):
+    def finalSave(self):
         # Keep this method idempotent because it may be called manually and by atexit.
         if self._saved:
             return

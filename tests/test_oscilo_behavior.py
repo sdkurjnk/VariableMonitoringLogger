@@ -413,7 +413,7 @@ class TestVMLBehavior(unittest.TestCase):
                     monitor.dispatcher._frame_cell_cache,
                 )
             finally:
-                monitor._finalSave()
+                monitor.finalSave()
 
     def test_yield_from_keeps_single_call_context(self):
         with tempfile.TemporaryDirectory() as temp_dir:

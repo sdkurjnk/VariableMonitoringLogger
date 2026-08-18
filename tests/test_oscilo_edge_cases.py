@@ -92,7 +92,7 @@ class TestVMlogEdgeCases(unittest.TestCase):
                 checkpoint = "after local update"
                 self.assertEqual(checkpoint, "after local update")
 
-                monitor._finalSave()
+                monitor.finalSave()
 
             run_local_scope()
             logs = read_jsonl(filename)
