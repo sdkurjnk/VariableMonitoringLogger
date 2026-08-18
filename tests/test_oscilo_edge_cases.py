@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-from oscilo._core import _Oscilo
+from oscilo.Oscilo import Oscilo
 
 GLOBAL_COLLISION_VALUE = "global-value"
 INIT_EVENT = "init"
@@ -16,7 +16,7 @@ def read_jsonl(filename):
 
 def finalize_and_read_logs(monitor, filename):
     # Flush pending tracking events before reading the generated log file.
-    monitor._finalSave()
+    monitor.finalSave()
     return read_jsonl(filename)
 
 def get_latest_entries_by_name(logs):
@@ -33,7 +33,7 @@ class TestVMlogEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "no_duplicate.jsonl")
 
             target = [1, 2, 3]
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             # Run several traced lines without changing the tracked value.
@@ -61,7 +61,7 @@ class TestVMlogEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "nested_mutable.jsonl")
 
             target = {"users": [{"name": "Alice", "score": 10}]}
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target["users"][0]["score"] = 20
@@ -83,7 +83,7 @@ class TestVMlogEdgeCases(unittest.TestCase):
 
             def run_local_scope():
                 target_name_collision = "local-value"
-                monitor = _Oscilo(filename)
+                monitor = Oscilo(filename)
                 monitor.register("target_name_collision")
 
                 target_name_collision = "local-updated"
@@ -92,7 +92,7 @@ class TestVMlogEdgeCases(unittest.TestCase):
                 checkpoint = "after local update"
                 self.assertEqual(checkpoint, "after local update")
 
-                monitor._finalSave()
+                monitor.finalSave()
 
             run_local_scope()
             logs = read_jsonl(filename)
@@ -108,7 +108,7 @@ class TestVMlogEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "stop_tracking.jsonl")
 
             target = [1]
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target.append(2)
@@ -141,7 +141,7 @@ class TestVMlogEdgeCases(unittest.TestCase):
             filename = os.path.join(temp_dir, "unicode.jsonl")
 
             target = {"message": "안녕하세요", "status": "준비"}
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target["status"] = "완료"
@@ -163,7 +163,7 @@ class TestVMlogEdgeCases(unittest.TestCase):
             number = 1.5
             values = (1, 2)
 
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("flag")
             monitor.register("number")
             monitor.register("values")

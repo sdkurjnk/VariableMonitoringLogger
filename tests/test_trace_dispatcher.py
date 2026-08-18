@@ -2,7 +2,7 @@ import sys
 import unittest
 
 from oscilo.HistoryBuffer import HistoryBuffer
-from oscilo.TraceDispatcher import TraceDispatcher
+from oscilo.TraceDispatcher import TraceDispatcher, GLOBAL_STATE_KEY
 
 MODULE_LEVEL_COUNTER = {"value": 0}
 
@@ -270,15 +270,14 @@ class TestTraceDispatcherConsecutiveRegistration(unittest.TestCase):
         self.assertEqual(second_events[0], ("init", "alpha"))
         self.assertEqual(second_events[-1], ("updated", "beta"))
 
-    def test_register_stores_new_state_in_shared_frame_state(self):
+    def test_register_stores_new_state_in_owning_tracker(self):
         frame = sys._getframe()
         target = [1, 2]
 
-        self.dispatcher.register("target", frame=frame)
+        tracker = self.dispatcher.register("target", frame=frame)
 
-        frame_state = self.dispatcher._frame_states[frame]
-        self.assertIn("target", frame_state)
-        self.assertIs(frame_state["target"]["ref"], target)
+        self.assertIn(frame, tracker._states)
+        self.assertIs(tracker._states[frame]["ref"], target)
 
 
 class TestTraceDispatcherGlobalDedup(unittest.TestCase):
@@ -338,14 +337,14 @@ class TestTraceDispatcherGlobalDedup(unittest.TestCase):
         self.assertEqual(updated_log["var_id"], init_log["var_id"])
         self.assertNotEqual(updated_log["call_id"], updated_log["var_id"])
 
-    def test_register_stores_new_state_in_global_states(self):
+    def test_register_stores_new_global_state_in_owning_tracker(self):
         global MODULE_LEVEL_COUNTER
         MODULE_LEVEL_COUNTER = {"value": 0}
 
         tracker = self.dispatcher.register("MODULE_LEVEL_COUNTER", frame=sys._getframe())
 
-        self.assertIn(tracker, self.dispatcher._global_states)
-        self.assertIs(self.dispatcher._global_states[tracker]["ref"], MODULE_LEVEL_COUNTER)
+        self.assertIn(GLOBAL_STATE_KEY, tracker._states)
+        self.assertIs(tracker._states[GLOBAL_STATE_KEY]["ref"], MODULE_LEVEL_COUNTER)
 
 
 class TestTraceDispatcherCallContextLaziness(unittest.TestCase):

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock
 
-from oscilo._core import _Oscilo
+from oscilo.Oscilo import Oscilo
 from oscilo.FileWriter import FileWriter
 from oscilo.HistoryBuffer import HistoryBuffer
 from oscilo.ScopeResolver import ScopeResolver
@@ -27,7 +27,7 @@ def read_text(filename):
 
 def finalize_and_read_logs(monitor, filename):
     # Force pending trace events to be written before assertions inspect logs.
-    monitor._finalSave()
+    monitor.finalSave()
     return read_jsonl(filename)
 
 class TestVMlogComponents(unittest.TestCase):
@@ -84,7 +84,7 @@ class TestVMlogComponents(unittest.TestCase):
         self.assertEqual(lines, history)
 
     def test_oscilo_register_delegates_resolution_to_dispatcher(self):
-        monitor = object.__new__(_Oscilo)
+        monitor = object.__new__(Oscilo)
         monitor.dispatcher = Mock()
         frame = sys._getframe()
 
@@ -130,7 +130,7 @@ class TestVMlogComponents(unittest.TestCase):
             filename = os.path.join(temp_dir, "deleted_event.jsonl")
 
             target = [1, 2]
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target.append(3)
@@ -155,16 +155,16 @@ class TestVMlogComponents(unittest.TestCase):
             filename = os.path.join(temp_dir, "idempotent_save.jsonl")
 
             target = ["start"]
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target.append("changed")
 
             # Saving twice should not rewrite or duplicate already flushed history.
-            monitor._finalSave()
+            monitor.finalSave()
             first_save = read_text(filename)
 
-            monitor._finalSave()
+            monitor.finalSave()
             second_save = read_text(filename)
 
         self.assertEqual(first_save, second_save)

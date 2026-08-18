@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-from oscilo._core import _Oscilo
+from oscilo.Oscilo import Oscilo
 
 EXPECTED_LOG_KEYS = {"name", "var_id", "data", "event", "domain", "line", "func", "call_id", "parent_call_id", "call_depth", }
 TRACKING_EVENTS = {"init", "updated", "deleted"}
@@ -16,7 +16,7 @@ def read_jsonl(filename):
 
 def finalize_and_read_logs(monitor, filename):
     # Force VML to flush tracked events before assertions inspect the log file.
-    monitor._finalSave()
+    monitor.finalSave()
     return read_jsonl(filename)
 
 class TestVMLBehavior(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "list_append.jsonl")
 
             target = [1, 2]
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target.append(3)
@@ -46,7 +46,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "dict_mutation.jsonl")
 
             target = {"count": 1, "items": ["A"]}
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target["count"] = 2
@@ -68,7 +68,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "immutable_reassignment.jsonl")
 
             target = "before"
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target = "after"
@@ -89,7 +89,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "deleted_variable.jsonl")
 
             target = [10, 20]
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             del target
@@ -113,7 +113,7 @@ class TestVMLBehavior(unittest.TestCase):
             first = [1]
             second = "alpha"
 
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("first")
             monitor.register("second")
 
@@ -143,7 +143,7 @@ class TestVMLBehavior(unittest.TestCase):
     def test_func_field_identifies_function_scope_for_same_variable_name(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "func_scope.jsonl")
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             def foo():
                 target = "foo-before"
                 monitor.register("target")
@@ -193,7 +193,7 @@ class TestVMLBehavior(unittest.TestCase):
             filename = os.path.join(temp_dir, "schema.jsonl")
 
             target = {"status": "ready"}
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
             monitor.register("target")
 
             target["status"] = "done"
@@ -221,7 +221,7 @@ class TestVMLBehavior(unittest.TestCase):
     def test_call_context_identifies_recursive_function_calls(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "recursive_context.jsonl")
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
 
             def factorial(n):
                 monitor.register("n")
@@ -260,7 +260,7 @@ class TestVMLBehavior(unittest.TestCase):
     def test_call_context_distinguishes_sibling_recursive_calls(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             filename = os.path.join(temp_dir, "sibling_recursive_context.jsonl")
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
 
             def fib(n):
                 monitor.register("n")
@@ -307,7 +307,7 @@ class TestVMLBehavior(unittest.TestCase):
                 temp_dir,
                 "generator_context.jsonl",
             )
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
 
             def generate():
                 n = 0
@@ -382,7 +382,7 @@ class TestVMLBehavior(unittest.TestCase):
                 temp_dir,
                 "generator_completion.jsonl",
             )
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
 
             def generate():
                 n = 0
@@ -413,7 +413,7 @@ class TestVMLBehavior(unittest.TestCase):
                     monitor.dispatcher._frame_cell_cache,
                 )
             finally:
-                monitor._finalSave()
+                monitor.finalSave()
 
     def test_yield_from_keeps_single_call_context(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -421,7 +421,7 @@ class TestVMLBehavior(unittest.TestCase):
                 temp_dir,
                 "yield_from_context.jsonl",
             )
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
 
             def delegated():
                 yield "first"
@@ -476,7 +476,7 @@ class TestVMLBehavior(unittest.TestCase):
                 temp_dir,
                 "coroutine_context.jsonl",
             )
-            monitor = _Oscilo(filename)
+            monitor = Oscilo(filename)
 
             class SuspendOnce:
                 def __await__(self):
