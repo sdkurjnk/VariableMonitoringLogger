@@ -2,7 +2,7 @@
 
 변수 이름 하나가 어느 스코프에 속하는지 판정하는 방식과, ENCLOSING을 다루기 위한 타협을 정리한다.
 
-관련 코드: `ScopeResolver.resolve`, `TraceDispatcher._ClosureResolver`
+관련 코드: `ScopeResolver.resolve`, `ScopeResolver.resolve_cell`
 
 ---
 
@@ -58,7 +58,7 @@ def outer():
 
 `sys.settrace` 콜백은 **프레임만 넘겨준다.** 실측상 `frame.f_locals`, `gc.get_referents(frame)`, `PyFrame_GetVar` 모두 **역참조된 값만** 주고 셀 객체는 주지 않는다 — 셀은 함수 객체의 `__closure__`로만 접근된다.
 
-그래서 `_ClosureResolver`는 역방향으로, 호출자 프레임(`frame.f_back`)의 네임스페이스를 훑어 다음을 만족하는 콜러블을 찾는다.
+그래서 `ScopeResolver.resolve_cell`은 역방향으로, 호출자 프레임(`frame.f_back`)의 네임스페이스를 훑어 다음을 만족하는 콜러블을 찾는다.
 
 1. 추적 중인 프레임과 **같은 코드 객체**를 쓴다
 2. 해당 인덱스의 셀 내용이 추적 중인 프레임의 **현재 값과 동일 객체**다
