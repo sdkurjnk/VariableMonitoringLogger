@@ -81,14 +81,6 @@ class TraceDispatcher:
     def setBuffer(self, buffer):
         self._bufferRef = buffer
 
-    def _is_local_name(self, frame, varName):
-        code = frame.f_code
-        return (
-            varName in code.co_varnames
-            or varName in code.co_cellvars
-            or varName in code.co_freevars
-        )
-
     def _is_enclosing_case(self, domain, tracker):
         if domain == ENCLOSING:
             return True
@@ -123,12 +115,6 @@ class TraceDispatcher:
 
         return var_id
 
-    def _record_tracker_cell(self, tracker, cell_key):
-        if cell_key is None:
-            return
-
-        self._tracker_cells.setdefault(tracker, set()).add(cell_key)
-
     def _guarded_check_and_log(self, fn, *args, **kwargs):
         # 추적 대상 값의 __eq__/__ne__(네이티브 비교 엔진 내부에서 호출됨)나
         # check-and-log 도중의 다른 내부 실패가 관찰 대상 프로그램으로 절대
@@ -141,7 +127,10 @@ class TraceDispatcher:
 
     def _check_and_log_enclosing(self, frame, tracker, varName):
         cell_key = self._resolve_cell_key_cached(frame, varName)
-        self._record_tracker_cell(tracker, cell_key)
+
+        # unregister 정리를 위해 이 tracker가 건드린 cell을 기록해 둔다.
+        if cell_key is not None:
+            self._tracker_cells.setdefault(tracker, set()).add(cell_key)
 
         # cell을 해석하지 못한 경우(caller-frame 휴리스틱이 소유 closure를
         # 찾지 못함)는 기존과 동일하게 frame별 state로 fallback한다: 변수는
@@ -161,10 +150,16 @@ class TraceDispatcher:
             raise ValueError("frame is required to register a variable tracker")
 
         resolved_domain, _ = self._resolver.resolve(frame, varName)
-        is_local = self._is_local_name(frame, varName)
+
+        code = frame.f_code
+        is_local = (
+            varName in code.co_varnames
+            or varName in code.co_cellvars
+            or varName in code.co_freevars
+        )
 
         if is_local:
-            dedup_key = (varName, frame.f_code)
+            dedup_key = (varName, code)
             tracker = self._registered_local.get(dedup_key)
         else:
             dedup_key = (varName, id(frame.f_globals))
@@ -184,7 +179,7 @@ class TraceDispatcher:
                 self._tracker_globals[tracker] = frame.f_globals
 
                 context = self._context_manager.ensure_context(frame)
-                self._global_var_ids[tracker] = self._get_context_call_id(context)
+                self._global_var_ids[tracker] = context["call_id"]
 
             # 새 tracker가 추가되면 어떤 code 객체에 어떤 tracker가 적용되는지가
             # 바뀔 수 있으므로, relevance 캐시를 더 이상 신뢰할 수 없다.
@@ -280,36 +275,6 @@ class TraceDispatcher:
 
         self._bufferRef.append(varName, var_id, data, event_name, domain, line, func, call_id, parent_call_id, call_depth, )
 
-    def _get_frame_line(self, frame):
-        if frame is None:
-            return None
-
-        return frame.f_lineno
-
-    def _get_frame_func(self, frame):
-        if frame is None:
-            return None
-
-        return frame.f_code.co_name
-
-    def _get_context_call_id(self, context):
-        if context is None:
-            return None
-
-        return context["call_id"]
-
-    def _get_context_parent_call_id(self, context):
-        if context is None:
-            return None
-
-        return context["parent_call_id"]
-
-    def _get_context_call_depth(self, context):
-        if context is None:
-            return None
-
-        return context["call_depth"]
-
     def _get_logged_domain(self, tracker, event_name, resolved_domain):
         # Preserve the previous scope when deletion makes the variable unresolvable.
         domain = resolved_domain
@@ -326,8 +291,10 @@ class TraceDispatcher:
         return domain
     
     def _log_event(self, frame, tracker, event_name, new_state, domain, cell=None):
-        context = self._context_manager.ensure_context(frame)
-        call_id = self._get_context_call_id(context)
+        # None-safe by construction: a None frame yields a None context, and both
+        # `context or {}` / the frame guards below then report None fields.
+        context = self._context_manager.ensure_context(frame) or {}
+        call_id = context.get("call_id")
 
         if domain == ENCLOSING and cell is not None:
             # var_id는 값을 소유한 closure cell을 식별하고, call_id는 항상 이
@@ -345,11 +312,11 @@ class TraceDispatcher:
             tracker.get_snapshot(new_state),
             event_name,
             self._get_logged_domain(tracker, event_name, domain),
-            self._get_frame_line(frame),
-            self._get_frame_func(frame),
+            frame.f_lineno if frame is not None else None,
+            frame.f_code.co_name if frame is not None else None,
             call_id,
-            self._get_context_parent_call_id(context),
-            self._get_context_call_depth(context),
+            context.get("parent_call_id"),
+            context.get("call_depth"),
         )
 
     def _check_and_log_global(self, frame, tracker, domain):
