@@ -198,14 +198,14 @@ class TraceDispatcher:
         # 등록 frame의 "call" 이벤트는 이 tracker가 생기기 전에 이미 발생했으므로,
         # line tracing을 여기서 명시적으로 붙여야 한다(또는 이전 등록/호출에서
         # 이미 붙어 있다면 그것을 재사용한다).
-        frame_state = self._ensure_frame_tracking(frame)
+        self._ensure_frame_tracking(frame)
         self._ensure_active_ancestor_tracking(frame, is_new_tracker)
 
         if self._is_enclosing_case(resolved_domain, tracker):
             self._guarded_check_and_log(self._check_and_log_enclosing, frame, tracker, varName)
         elif is_local:
             self._guarded_check_and_log(
-                self._check_and_log, frame, tracker, frame_state, varName, resolved_domain
+                self._check_and_log_local, frame, tracker, resolved_domain
             )
         else:
             self._guarded_check_and_log(
@@ -217,6 +217,8 @@ class TraceDispatcher:
     def unregister(self, tracker):
         if tracker in self._trackers:
             self._trackers.remove(tracker)
+
+        tracker.reset()
 
         code = self._tracker_codes.pop(tracker, None)
         if code is not None:
@@ -242,6 +244,8 @@ class TraceDispatcher:
             self._stop_tracing()
 
     def stop(self):
+        for tracker in self._trackers:
+            tracker.reset()
         self._trackers.clear()
         self._stop_tracing()
 
@@ -365,6 +369,24 @@ class TraceDispatcher:
 
         return event_name, new_state
 
+    def _check_and_log_local(self, frame, tracker, domain):
+        # LOCAL state is owned by the tracker and keyed by frame; the dispatcher
+        # no longer holds the previous value, it just asks the tracker to check.
+        event_name, new_state = tracker.check_owned(frame, domain, frame)
+
+        if event_name in BUFFERED_EVENTS:
+            self._log_event(frame, tracker, event_name, new_state, domain)
+
+        return event_name, new_state
+
+    def _forget_frame_local_states(self, frame):
+        # LOCAL state is frame-keyed and dies with the frame, mirroring the old
+        # _frame_states.pop(frame) on return. ENCLOSING/GLOBAL keep their own
+        # lifetimes and are untouched here.
+        local_relevant, _ = self._relevant_for(frame)
+        for tracker in local_relevant:
+            tracker.forget(frame)
+
     def _get_cache_entry(self, frame):
         code = frame.f_code
         entry = self._frame_cache.get(code)
@@ -394,7 +416,7 @@ class TraceDispatcher:
 
         return local_relevant, global_relevant
 
-    def _process_frame(self, frame, frame_state):
+    def _process_frame(self, frame):
         local_relevant, global_relevant = self._relevant_for(frame)
 
         for tracker in local_relevant:
@@ -406,7 +428,7 @@ class TraceDispatcher:
                 )
             else:
                 self._guarded_check_and_log(
-                    self._check_and_log, frame, tracker, frame_state, tracker.varName, domain
+                    self._check_and_log_local, frame, tracker, domain
                 )
 
         for tracker in global_relevant:
@@ -415,18 +437,19 @@ class TraceDispatcher:
                 self._check_and_log, frame, tracker, self._global_states, tracker, domain
             )
 
-    def _make_line_tracer(self, frame_state):
+    def _make_line_tracer(self):
         def trace_lines(current_frame, current_event, current_arg):
             if current_event not in ("line", "return"):
                 return trace_lines
 
-            self._process_frame(current_frame, frame_state)
+            self._process_frame(current_frame)
 
             if current_event == "return":
                 if is_suspended_return(current_frame):
                     return trace_lines
 
                 self._context_manager.on_return(current_frame)
+                self._forget_frame_local_states(current_frame)
                 self._frame_states.pop(current_frame, None)
                 self._frame_cell_cache.pop(current_frame, None)
                 return None
@@ -442,7 +465,7 @@ class TraceDispatcher:
 
         frame_state = {}
         self._frame_states[frame] = frame_state
-        frame.f_trace = self._make_line_tracer(frame_state)
+        frame.f_trace = self._make_line_tracer()
         return frame_state
 
     def _ensure_active_ancestor_tracking(self, frame, is_new_tracker):

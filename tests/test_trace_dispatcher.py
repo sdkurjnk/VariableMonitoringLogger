@@ -270,15 +270,14 @@ class TestTraceDispatcherConsecutiveRegistration(unittest.TestCase):
         self.assertEqual(second_events[0], ("init", "alpha"))
         self.assertEqual(second_events[-1], ("updated", "beta"))
 
-    def test_register_stores_new_state_in_shared_frame_state(self):
+    def test_register_stores_new_state_in_owning_tracker(self):
         frame = sys._getframe()
         target = [1, 2]
 
-        self.dispatcher.register("target", frame=frame)
+        tracker = self.dispatcher.register("target", frame=frame)
 
-        frame_state = self.dispatcher._frame_states[frame]
-        self.assertIn("target", frame_state)
-        self.assertIs(frame_state["target"]["ref"], target)
+        self.assertIn(frame, tracker._states)
+        self.assertIs(tracker._states[frame]["ref"], target)
 
 
 class TestTraceDispatcherGlobalDedup(unittest.TestCase):

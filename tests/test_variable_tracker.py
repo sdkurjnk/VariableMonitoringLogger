@@ -302,12 +302,13 @@ class TestVariableTrackerState(unittest.TestCase):
         self.assertEqual(event_name, NOT_FOUND_EVENT)
         self.assertIsNone(new_state)
 
-    def test_tracker_instance_keeps_only_identity_metadata(self):
+    def test_tracker_instance_owns_identity_metadata_and_state(self):
         self.assertEqual(
             vars(self.tracker),
             {
                 "varName": "target",
                 "domain": None,
+                "_states": {},
             },
         )
 

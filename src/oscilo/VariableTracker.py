@@ -34,6 +34,10 @@ class VariableTracker:
     def __init__(self, varName, domain=None):
         self.varName = varName
         self.domain = domain
+        # The tracker owns its comparison state, keyed per scope instance.
+        # LOCAL uses the frame as the key so recursion keeps independent
+        # timelines. GLOBAL/ENCLOSING still route through the dispatcher for now.
+        self._states = {}
 
     def _make_state(self, value):
         # Frame state always keeps the current live reference. Only atomic values
@@ -97,7 +101,33 @@ class VariableTracker:
             state["copy_failed"] = True
             return _SNAPSHOT_COPY_FAILED
 
-    def check(
+    def check(self, frame, domain, varName=None, prev_state=None):
+        # Transitional entry point: GLOBAL/ENCLOSING still have the dispatcher
+        # pass the previous state in. LOCAL goes through check_owned instead so
+        # the tracker owns its own per-frame state.
+        return self._evaluate(frame, domain, varName, prev_state)
+
+    def check_owned(self, frame, domain, key):
+        # The dispatcher only says "check this scope instance"; the tracker looks
+        # up and stores its own state under `key` (the frame for LOCAL).
+        prev_state = self._states.get(key)
+        event_name, new_state = self._evaluate(frame, domain, self.varName, prev_state)
+
+        if new_state is None:
+            self._states.pop(key, None)
+        else:
+            self._states[key] = new_state
+
+        return event_name, new_state
+
+    def forget(self, key):
+        # Drop the state for one scope instance (e.g. a returning frame).
+        self._states.pop(key, None)
+
+    def reset(self):
+        self._states.clear()
+
+    def _evaluate(
         self,
         frame,
         domain,
