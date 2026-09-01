@@ -29,7 +29,7 @@ oscilo는 GitFlow 기반의 자동화 릴리스 파이프라인을 쓴다. 기�
                      |                                  |
                      ▼                                  ▼
 
- hotfix (출시 후 긴급): master ─[사람 분기]▶ hotfix/vX.Y.(Z+1) ─수정▶
+ hotfix (출시 후 긴급): master ─[Actions "Make Hotfix"]▶ hotfix/vX.Y.(Z+1) ─수정▶
    〔사람 finalize〕▶ tag(Z+1) ▶ master·develop auto-merge ▶ Release→PyPI ▶ 삭제
 ```
 
@@ -123,10 +123,12 @@ develop을 다시 받아 재실행하면 통과한다.
 
 이미 배포된 버전에 심각한 버그가 있을 때만 해당한다. 일반 기여는 §1~2로 충분하다.
 
-1. **`master`에서** 분기한다: `git checkout -b hotfix/vX.Y.Z origin/master`
-   (Z = 현재 최신 태그의 패치 +1). develop이 아니라 master 기준이어야 미출시 기능이 딸려가지 않는다.
+1. Actions 탭에서 **Make Hotfix Branch** 워크플로를 실행한다. master tip에서
+   `hotfix/vX.Y.(Z+1)`을 자동으로 만든다(Z = master 도달 태그의 패치). develop이 아닌
+   master에서 분기하는 이유는 미출시 기능이 딸려가지 않게 하기 위함이다.
+   - 열려 있는 release/hotfix가 있으면 실패한다(1:1 직렬화, §4). 먼저 마무리한 뒤 다시 실행한다.
 
-2. 수정하고 push한다. 핫픽스는 정의상 항상 PATCH라 버전 라벨이 필요 없다.
+2. 만들어진 브랜치를 checkout해 수정하고 push한다. 핫픽스는 정의상 항상 PATCH라 버전 라벨이 필요 없다.
 
 3. 이후 finalize·배포는 릴리스 담당이 진행한다(§3와 동일한 자동 흐름).
 

@@ -1,0 +1,87 @@
+name: Make Hotfix Branch
+
+# Manual entry point for the hotfix lane (GitFlowPipeline.md §3, contributing-gitflow.md §5).
+# Cuts hotfix/vX.Y.(Z+1) from master's tip so no unreleased develop work is dragged in.
+# The tag and master/develop merges are NOT done here — that is "Finish Release / Hotfix"
+# (finalize.yml), which already handles hotfix/* because the version is encoded in the
+# branch name.
+on:
+  workflow_dispatch:
+
+jobs:
+  make-hotfix:
+    name: Cut hotfix branch from master
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # create the hotfix/* ref
+    steps:
+      # 1:1 serialization (Key Point 4): never cut a hotfix while any release/hotfix is open.
+      - name: Ensure no release/hotfix is already open
+        id: guard
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const open = [];
+            for (const prefix of ['heads/release/', 'heads/hotfix/']) {
+              const refs = await github.rest.git.listMatchingRefs({ owner, repo, ref: prefix });
+              open.push(...refs.data.map(r => r.ref.replace('refs/heads/', '')));
+            }
+            if (open.length > 0) {
+              core.setFailed(`release/hotfix already open: [${open.join(', ')}]. Finish it first.`);
+            }
+
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0        # need full history + tags for git describe
+
+      # Base = the tag topologically reachable from master (the last shipped version),
+      # NOT the highest numeric tag. Matches cut-release.yml's rationale re: the orphan
+      # v1.4.0 that must be ignored.
+      - name: Compute next patch version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$(git describe --tags --abbrev=0)"
+          echo "base tag reachable from master: $base"
+          ver="${base#v}"
+          IFS='.' read -r X Y Z <<< "$ver"
+          Z=$((Z+1))
+          next="v${X}.${Y}.${Z}"
+          echo "next hotfix version: $next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create hotfix branch with an opening commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.ver.outputs.version }}';
+            const { owner, repo } = context.repo;
+            const base = await github.rest.git.getRef({ owner, repo, ref: 'heads/master' });
+            const parent = base.data.object.sha;
+            const parentCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: parent });
+
+            // Empty commit (same tree as master tip) so the branch always has one commit
+            // beyond master. Otherwise a hotfix with no fixes would open a diff-less
+            // back-merge PR (GitHub 422) and stall finalize/post-merge. See cut-release.yml
+            // for the same rationale on release branches.
+            const commit = await github.rest.git.createCommit({
+              owner, repo,
+              message: `chore(hotfix): open ${version}\n\nHotfix branch cut from master. Add fixes here, then run "Finish Release / Hotfix".`,
+              tree: parentCommit.data.tree.sha,
+              parents: [parent],
+            });
+            const branch = `hotfix/${version}`;
+            try {
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+              core.notice(`Created ${branch} at ${commit.data.sha.slice(0, 7)} (opening commit). Push fixes, then run "Finish Release / Hotfix".`);
+            } catch (e) {
+              if (e.status === 422) {
+                core.warning(`Branch ${branch} already exists — skipping creation.`);
+              } else {
+                throw e;
+              }
+            }
